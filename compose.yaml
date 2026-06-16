@@ -1,10 +1,40 @@
 services:
   mysql:
-    image: 'mysql:latest'
+    image: 'mysql:8.4'
+    container_name: modi-mysql
     environment:
       - 'MYSQL_DATABASE=mydatabase'
       - 'MYSQL_PASSWORD=secret'
       - 'MYSQL_ROOT_PASSWORD=verysecret'
       - 'MYSQL_USER=myuser'
     ports:
-      - '3306'
+      - '3306:3306'
+    volumes:
+      - 'mysql-data:/var/lib/mysql'
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-uroot', '-pverysecret']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # The application service is gated behind the "app" compose profile so that
+  # Spring Boot's dev-time docker-compose integration (during `./gradlew bootRun`)
+  # only starts MySQL. Run the full stack with:  docker compose --profile app up --build
+  app:
+    build:
+      context: .
+    container_name: modi-backend
+    profiles: ['app']
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      - 'SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/mydatabase'
+      - 'SPRING_DATASOURCE_USERNAME=myuser'
+      - 'SPRING_DATASOURCE_PASSWORD=secret'
+    ports:
+      - '8080:8080'
+
+volumes:
+  mysql-data:

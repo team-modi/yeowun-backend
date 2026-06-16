@@ -1,0 +1,24 @@
+# Build output
+build/
+.gradle/
+out/
+bin/
+
+# IDE / editor
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+
+# VCS
+.git/
+.gitignore
+.gitattributes
+
+# Docs / misc
+HELP.md
+README.md
+
+# OS files
+.DS_Store
