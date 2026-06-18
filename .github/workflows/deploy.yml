@@ -1,0 +1,30 @@
+name: Deploy to EC2
+
+# main에 push/merge되면 EC2에 SSH로 접속해 재배포한다.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: deploy-ec2
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          command_timeout: 20m
+          script: |
+            set -e
+            cd ~/modi-backend
+            git fetch origin main
+            git reset --hard origin/main
+            sudo docker compose --profile app up -d --build
+            sudo docker compose --profile app ps
