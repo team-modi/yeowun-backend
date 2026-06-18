@@ -25,6 +25,7 @@ jobs:
             set -e
             cd ~/modi-backend
             git fetch origin main
+            git checkout -B main origin/main
             git reset --hard origin/main
             sudo docker compose --profile app up -d --build
             sudo docker compose --profile app ps
