@@ -44,4 +44,4 @@ spring:
 app:
   cors:
     allowed-origin-patterns:
-      - https://modi.vercel.app # Vercel 운영 도메인 (이것만 허용)
+      - https://mmodi.vercel.app # Vercel 운영 도메인 (이것만 허용)
