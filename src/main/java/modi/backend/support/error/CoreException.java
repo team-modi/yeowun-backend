@@ -1,0 +1,20 @@
+package modi.backend.support.error;
+
+public class CoreException extends RuntimeException {
+
+	private final ErrorCode errorCode;
+
+	public CoreException(ErrorCode errorCode) {
+		super(errorCode.message());
+		this.errorCode = errorCode;
+	}
+
+	public CoreException(ErrorCode errorCode, String message) {
+		super(message);
+		this.errorCode = errorCode;
+	}
+
+	public ErrorCode errorCode() {
+		return errorCode;
+	}
+}

@@ -1,0 +1,46 @@
+package modi.backend.infra.record;
+
+import java.time.LocalDate;
+import java.util.Optional;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import modi.backend.domain.record.Record;
+import modi.backend.domain.record.WriteMode;
+
+public interface RecordJpaRepository extends JpaRepository<Record, Long> {
+
+	Optional<Record> findByIdAndDeletedAtIsNull(Long id);
+
+	@Query("""
+			select distinct r
+			from Record r
+			left join r.keywords k
+			left join r.emotions e
+			where r.userId = :userId
+			  and r.deletedAt is null
+			  and (:keyword is null or r.content like concat('%', :keyword, '%')
+			       or r.aiSummary like concat('%', :keyword, '%')
+			       or k.keyword like concat('%', :keyword, '%'))
+			  and (:emotion is null or e.emotionCode = :emotion)
+			  and (:exhibitionId is null or r.exhibitionId = :exhibitionId)
+			  and (:bookmarked is null or r.bookmarked = :bookmarked)
+			  and (:writeMode is null or r.writeMode = :writeMode)
+			  and (:fromViewedAt is null or r.viewedAt >= :fromViewedAt)
+			  and (:toViewedAt is null or r.viewedAt <= :toViewedAt)
+			""")
+	Page<Record> search(
+			@Param("userId") Long userId,
+			@Param("keyword") String keyword,
+			@Param("emotion") String emotion,
+			@Param("exhibitionId") Long exhibitionId,
+			@Param("bookmarked") Boolean bookmarked,
+			@Param("writeMode") WriteMode writeMode,
+			@Param("fromViewedAt") LocalDate fromViewedAt,
+			@Param("toViewedAt") LocalDate toViewedAt,
+			Pageable pageable);
+}
