@@ -1,0 +1,429 @@
+{
+  "info": {
+    "_postman_id": "fc64a22a-360c-4ef6-a4d5-99a21f582d77",
+    "name": "Modi Record Archive API",
+    "description": "Local Docker 검수용 기록/아카이브 API 컬렉션입니다. baseUrl 기본값은 http://localhost:18080 입니다.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "01 Health",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('health is UP', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.status).to.eql('UP');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/actuator/health"
+      },
+      "response": []
+    },
+    {
+      "name": "02 OpenAPI Docs",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('record paths are documented', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.paths).to.have.property('/api/v1/records');",
+              "  pm.expect(json.paths).to.have.property('/api/v1/records/{recordId}');",
+              "  pm.expect(json.paths).to.have.property('/api/v1/records/{recordId}/bookmark');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/v3/api-docs"
+      },
+      "response": []
+    },
+    {
+      "name": "03 Create Record",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('record is created', function () {",
+              "  pm.response.to.have.status(201);",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.meta.result).to.eql('SUCCESS');",
+              "  pm.expect(json.data.recordId).to.be.a('number');",
+              "  pm.expect(json.data.aiStatus).to.eql('READY');",
+              "  pm.environment.set('recordId', json.data.recordId);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-User-Id",
+            "value": "{{userId}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"exhibitionId\": 51,\n  \"writeMode\": \"AI\",\n  \"viewedAt\": \"2020-06-28\",\n  \"content\": \"Postman으로 남기는 전시 기록입니다.\",\n  \"emotionCodes\": [\"MOVED\", \"CALM\"],\n  \"userKeywords\": [\"색감\", \"여운\"],\n  \"aiKeywords\": [\"따뜻한 색감\", \"위로\"],\n  \"aiSummary\": \"평온하고 뭉클한 관람.\",\n  \"representativeEmotion\": \"MOVED\",\n  \"cardPhrase\": \"그날, 색이 나를 붙잡았다\",\n  \"media\": [\n    {\n      \"type\": \"PHOTO\",\n      \"url\": \"https://example.com/image.jpg\",\n      \"sortOrder\": 0,\n      \"sizeBytes\": 1048576\n    }\n  ]\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{baseUrl}}/api/v1/records"
+      },
+      "response": []
+    },
+    {
+      "name": "04 Get Record Detail",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('record detail matches created data', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.meta.result).to.eql('SUCCESS');",
+              "  pm.expect(json.data.recordId).to.eql(Number(pm.environment.get('recordId')));",
+              "  pm.expect(json.data.exhibitionId).to.eql(51);",
+              "  pm.expect(json.data.emotionCodes).to.include('MOVED');",
+              "  pm.expect(json.data.media[0].type).to.eql('PHOTO');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-User-Id",
+            "value": "{{userId}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/v1/records/{{recordId}}"
+      },
+      "response": []
+    },
+    {
+      "name": "05 Search Records",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('search returns a page', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.meta.result).to.eql('SUCCESS');",
+              "  pm.expect(json.data.content).to.be.an('array');",
+              "  pm.expect(json.data.page).to.eql(0);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-User-Id",
+            "value": "{{userId}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/records?keyword=%EC%83%89%EA%B0%90&emotion=MOVED&page=0&size=20",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "records"
+          ],
+          "query": [
+            {
+              "key": "keyword",
+              "value": "색감"
+            },
+            {
+              "key": "emotion",
+              "value": "MOVED"
+            },
+            {
+              "key": "page",
+              "value": "0"
+            },
+            {
+              "key": "size",
+              "value": "20"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "06 Update Record",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('record is updated', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.meta.result).to.eql('SUCCESS');",
+              "  pm.expect(json.data.content).to.eql('Postman에서 수정한 기록입니다.');",
+              "  pm.expect(json.data.emotionCodes).to.deep.eql(['CALM']);",
+              "  pm.expect(json.data.media).to.be.an('array').that.is.empty;",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-User-Id",
+            "value": "{{userId}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"viewedAt\": \"2020-06-29\",\n  \"content\": \"Postman에서 수정한 기록입니다.\",\n  \"emotionCodes\": [\"CALM\"],\n  \"userKeywords\": [\"수정\"],\n  \"aiKeywords\": [],\n  \"aiSummary\": \"수정된 요약\",\n  \"representativeEmotion\": \"CALM\",\n  \"cardPhrase\": \"다시 남긴 여운\",\n  \"media\": []\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{baseUrl}}/api/v1/records/{{recordId}}"
+      },
+      "response": []
+    },
+    {
+      "name": "07 Bookmark Record",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('record is bookmarked', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.meta.result).to.eql('SUCCESS');",
+              "  pm.expect(json.data.bookmarked).to.eql(true);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-User-Id",
+            "value": "{{userId}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/v1/records/{{recordId}}/bookmark"
+      },
+      "response": []
+    },
+    {
+      "name": "08 Unbookmark Record",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('record is unbookmarked', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.meta.result).to.eql('SUCCESS');",
+              "  pm.expect(json.data.bookmarked).to.eql(false);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "X-User-Id",
+            "value": "{{userId}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/v1/records/{{recordId}}/bookmark"
+      },
+      "response": []
+    },
+    {
+      "name": "09 Reject Video Over 100MB",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('video over 100MB is rejected', function () {",
+              "  pm.response.to.have.status(400);",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.meta.result).to.eql('FAIL');",
+              "  pm.expect(json.meta.errorCode).to.eql('INVALID_MEDIA');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-User-Id",
+            "value": "{{userId}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"exhibitionId\": 51,\n  \"writeMode\": \"DIRECT\",\n  \"viewedAt\": \"2020-06-28\",\n  \"content\": \"영상 용량 제한 검증\",\n  \"emotionCodes\": [\"MOVED\"],\n  \"media\": [\n    {\n      \"type\": \"VIDEO\",\n      \"url\": \"https://example.com/video.mp4\",\n      \"sortOrder\": 0,\n      \"sizeBytes\": 104857601\n    }\n  ]\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{baseUrl}}/api/v1/records"
+      },
+      "response": []
+    },
+    {
+      "name": "10 Reject Missing User Header",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('missing user header is unauthorized', function () {",
+              "  pm.response.to.have.status(401);",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.meta.result).to.eql('FAIL');",
+              "  pm.expect(json.meta.errorCode).to.eql('UNAUTHORIZED');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/v1/records"
+      },
+      "response": []
+    },
+    {
+      "name": "11 Delete Record",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('record is deleted', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.meta.result).to.eql('SUCCESS');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "X-User-Id",
+            "value": "{{userId}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/v1/records/{{recordId}}"
+      },
+      "response": []
+    },
+    {
+      "name": "12 Get Deleted Record Returns 404",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('deleted record is not found', function () {",
+              "  pm.response.to.have.status(404);",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.meta.result).to.eql('FAIL');",
+              "  pm.expect(json.meta.errorCode).to.eql('NOT_FOUND');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-User-Id",
+            "value": "{{userId}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/v1/records/{{recordId}}"
+      },
+      "response": []
+    }
+  ]
+}
