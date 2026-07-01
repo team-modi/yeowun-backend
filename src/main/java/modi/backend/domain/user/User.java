@@ -30,6 +30,10 @@ public class User extends BaseEntity {
 	@Column(nullable = false)
 	private String nickname;
 
+	/** 실명(소셜 동의항목 name). 카카오 이름·구글 name에서 받아온다. 미동의/미지원 시 null. */
+	@Column(length = 50)
+	private String name;
+
 	@Column(nullable = false)
 	private boolean profileCompleted;
 
@@ -51,8 +55,9 @@ public class User extends BaseEntity {
 	@Column(name = "birth_year")
 	private Integer birthYear;
 
-	private User(String nickname, AgeGroup ageGroup, Integer birthYear) {
+	private User(String nickname, String name, AgeGroup ageGroup, Integer birthYear) {
 		this.nickname = nickname;
+		this.name = name;
 		this.profileCompleted = false;
 		this.ageGroup = ageGroup == null ? AgeGroup.UNSPECIFIED : ageGroup;
 		this.birthYear = birthYear;
@@ -65,7 +70,12 @@ public class User extends BaseEntity {
 
 	/** 소셜 가입 시: nickname(없으면 기본값)·연령대·출생연도를 소셜 프로필에서 받아 채운다. 프로필은 미완 상태. */
 	public static User createFromSocial(String nickname, AgeGroup ageGroup, Integer birthYear) {
-		return new User(nickname == null || nickname.isBlank() ? "사용자" : nickname, ageGroup, birthYear);
+		return createFromSocial(nickname, null, ageGroup, birthYear);
+	}
+
+	/** 소셜 가입 시: nickname·이름(name)·연령대·출생연도를 소셜 동의항목에서 받아 채운다. 프로필은 미완 상태. */
+	public static User createFromSocial(String nickname, String name, AgeGroup ageGroup, Integer birthYear) {
+		return new User(nickname == null || nickname.isBlank() ? "사용자" : nickname, name, ageGroup, birthYear);
 	}
 
 	/**

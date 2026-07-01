@@ -61,7 +61,7 @@ class AuthFacadeTest {
 	@DisplayName("login: 기존 연결 없으면 User+SocialAccount 신규 생성")
 	void login_신규가입() {
 		given(kakaoClient.fetchUserInfo(anyString(), anyString()))
-				.willReturn(new OAuthUserInfo("sub-1", "a@b.com", "진", AgeGroup.TWENTIES, 1993));
+				.willReturn(new OAuthUserInfo("sub-1", "a@b.com", "홍길동", "진", AgeGroup.TWENTIES, 1993));
 		given(socialAccountRepository.findByProviderAndProviderUserId("kakao", "sub-1"))
 				.willReturn(Optional.empty());
 		given(userRepository.save(any(User.class))).willAnswer(inv -> inv.getArgument(0));
@@ -80,7 +80,7 @@ class AuthFacadeTest {
 	@DisplayName("login: 기존 연결 있으면 그 User로 로그인, 신규 가입 없음")
 	void login_기존연결() {
 		given(kakaoClient.fetchUserInfo(anyString(), anyString()))
-				.willReturn(new OAuthUserInfo("sub-1", "new@b.com", "진", AgeGroup.UNSPECIFIED, null));
+				.willReturn(new OAuthUserInfo("sub-1", "new@b.com", "홍길동", "진", AgeGroup.UNSPECIFIED, null));
 		SocialAccount existing = SocialAccount.create(5L, "kakao", "sub-1", "old@b.com");
 		given(socialAccountRepository.findByProviderAndProviderUserId("kakao", "sub-1"))
 				.willReturn(Optional.of(existing));

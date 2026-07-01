@@ -59,9 +59,9 @@ public class AuthFacade {
 					.orElseThrow(() -> new CoreException(AuthErrorCode.SOCIAL_ACCOUNT_LINK_BROKEN,
 							"연결된 사용자 없음: " + userId));
 		} else {
-			// 신규 가입: 소셜 동의항목의 연령대·출생연도까지 반영(재로그인 시엔 사용자 편집을 덮지 않도록 미반영).
+			// 신규 가입: 소셜 동의항목의 이름·연령대·출생연도까지 반영(재로그인 시엔 사용자 편집을 덮지 않도록 미반영).
 			user = userRepository.save(
-					User.createFromSocial(info.nickname(), info.ageGroup(), info.birthYear()));
+					User.createFromSocial(info.nickname(), info.name(), info.ageGroup(), info.birthYear()));
 			social = socialAccountRepository.save(
 					SocialAccount.create(user.getId(), target.code(), info.sub(), info.email()));
 		}

@@ -18,14 +18,19 @@ public final class AuthDto {
 	/** 로그인/재발급 응답. access·refresh는 HttpOnly 쿠키로 내려가고, accessToken은 비쿠키 클라이언트 호환용으로 본문에도 둔다. */
 	public record TokenResponse(String accessToken, User user) {
 
-		public record User(Long userId, String nickname, boolean profileCompleted, String provider, String email) {
+		/**
+		 * 로그인 사용자 요약. 소셜 동의항목에서 받은 name(이름)·ageGroup(연령대)·birthYear(출생연도)를 포함한다.
+		 * 미동의/미지원 항목은 null(ageGroup은 UNSPECIFIED → null).
+		 */
+		public record User(Long userId, String nickname, String name, boolean profileCompleted, String provider,
+				String email, String ageGroup, Integer birthYear) {
 		}
 
 		public static TokenResponse from(AuthResult.Login result) {
 			return new TokenResponse(
 					result.accessToken(),
-					new User(result.userId(), result.nickname(), result.profileCompleted(),
-							result.provider(), result.email()));
+					new User(result.userId(), result.nickname(), result.name(), result.profileCompleted(),
+							result.provider(), result.email(), result.ageGroup(), result.birthYear()));
 		}
 	}
 }

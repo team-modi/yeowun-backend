@@ -34,11 +34,13 @@ public class GoogleOAuthClient extends AbstractOAuthClient {
 		Map<String, Object> token = googleApi.getToken(
 				tokenForm(props.clientId(), props.clientSecret(), redirectUri, code));
 		Map<String, Object> body = googleApi.getUserInfo("Bearer " + extractAccessToken(token));
-		// 구글 기본 프로필엔 연령대·출생연도가 없다 → UNSPECIFIED·null.
+		// 구글 기본 프로필엔 연령대·출생연도가 없다 → UNSPECIFIED·null. name은 닉네임 겸용으로 쓴다.
+		String name = (String) body.get("name");
 		return new OAuthUserInfo(
 				String.valueOf(body.get("id")),
 				(String) body.get("email"),
-				(String) body.get("name"),
+				name,
+				name,
 				AgeGroup.UNSPECIFIED,
 				null);
 	}
