@@ -10,6 +10,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import lombok.RequiredArgsConstructor;
 import modi.backend.interfaces.auth.AuthenticationArgumentResolver;
+import modi.backend.interfaces.auth.OptionalAuthenticationArgumentResolver;
 
 /**
  * 전역 웹 설정. CORS + {@code @Authentication} 인자 리졸버 등록.
@@ -23,10 +24,12 @@ public class WebConfig implements WebMvcConfigurer {
 
 	private final CorsProperties corsProperties;
 	private final AuthenticationArgumentResolver authenticationArgumentResolver;
+	private final OptionalAuthenticationArgumentResolver optionalAuthenticationArgumentResolver;
 
 	@Override
 	public void addArgumentResolvers(List<HandlerMethodArgumentResolver> resolvers) {
 		resolvers.add(authenticationArgumentResolver);
+		resolvers.add(optionalAuthenticationArgumentResolver);
 	}
 
 	@Override
