@@ -257,13 +257,14 @@ class AuthFlowIntegrationTest {
 	}
 
 	@Test
-	@DisplayName("카카오 동의항목(연령대·출생연도) 신규 가입 시 반영 → /users/me에 ageGroup·birthYear")
-	void 카카오_연령대_출생연도_반영() throws Exception {
+	@DisplayName("카카오 동의항목(이름·연령대·출생연도) 신규 가입 시 로그인 응답 user + /users/me에 반영")
+	void 카카오_이름_연령대_출생연도_반영() throws Exception {
 		given(kakaoApi.getToken(any())).willReturn(Map.of("access_token", "kakao-access-token"));
 		given(kakaoApi.getUserInfo(anyString())).willReturn(Map.of(
 				"id", 8888007,
 				"kakao_account", Map.of(
 						"email", "age@kakao.com",
+						"name", "홍길동",
 						"age_range", "20~29",
 						"birthyear", "1998",
 						"profile", Map.of("nickname", "연령대유저"))));
@@ -271,10 +272,15 @@ class AuthFlowIntegrationTest {
 						.contentType(MediaType.APPLICATION_JSON)
 						.content("{\"code\":\"c\",\"redirectUri\":\"" + REDIRECT_URI + "\"}"))
 				.andExpect(status().isOk())
+				// 로그인 응답 user에 이름·연령대·출생연도가 함께 실려 온다
+				.andExpect(jsonPath("$.data.user.name").value("홍길동"))
+				.andExpect(jsonPath("$.data.user.ageGroup").value("TWENTIES"))
+				.andExpect(jsonPath("$.data.user.birthYear").value(1998))
+				.andExpect(jsonPath("$.data.user.email").value("age@kakao.com"))
 				.andReturn();
 		String accessToken = JsonPath.read(login.getResponse().getContentAsString(), "$.data.accessToken");
 
-		// 소셜 동의항목이 도메인까지 반영됐는지 프로필 조회로 확인
+		// 소셜 동의항목이 도메인까지 반영됐는지 프로필 조회로도 확인
 		mockMvc.perform(get("/api/v1/users/me").header("Authorization", "Bearer " + accessToken))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.data.ageGroup").value("TWENTIES")) // age_range "20~29" → TWENTIES

@@ -1,0 +1,19 @@
+package modi.backend.infra.exhibition;
+
+import java.util.Optional;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+
+import modi.backend.domain.exhibition.Exhibition;
+
+/**
+ * Spring Data JPA. 동적 필터(keyword·date·region·category·CUSTOM 노출)는
+ * {@link JpaSpecificationExecutor}로 조합한다(프로젝트에 QueryDSL 미도입 → Specification 사용).
+ */
+public interface ExhibitionJpaRepository
+		extends JpaRepository<Exhibition, Long>, JpaSpecificationExecutor<Exhibition> {
+
+	/** soft delete된 행은 제외하고 원천 식별자로 조회(동기화 upsert용). */
+	Optional<Exhibition> findByExternalIdAndDeletedAtIsNull(String externalId);
+}
