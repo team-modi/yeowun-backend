@@ -39,6 +39,7 @@ public class KakaoOAuthClient extends AbstractOAuthClient {
 		String sub = String.valueOf(body.get("id"));
 		Map<String, Object> account = (Map<String, Object>) body.getOrDefault("kakao_account", Map.of());
 		String email = (String) account.get("email"); // 비동의 시 null
+		String name = (String) account.get("name"); // 이름(name) 동의항목, 미동의 시 null
 		Map<String, Object> profile = (Map<String, Object>) account.getOrDefault("profile", Map.of());
 		String nickname = (String) profile.get("nickname");
 		if (nickname == null) {
@@ -48,7 +49,7 @@ public class KakaoOAuthClient extends AbstractOAuthClient {
 		// 동의항목: 연령대(age_range "20~29") + 출생연도(birthyear "1993"). 미동의 시 각각 null.
 		AgeGroup ageGroup = AgeGroup.fromKakaoAgeRange((String) account.get("age_range"));
 		Integer birthYear = parseBirthYear((String) account.get("birthyear"));
-		return new OAuthUserInfo(sub, email, nickname, ageGroup, birthYear);
+		return new OAuthUserInfo(sub, email, name, nickname, ageGroup, birthYear);
 	}
 
 	/** 카카오 birthyear("1993") → Integer. 미동의/파싱 불가 시 null. */

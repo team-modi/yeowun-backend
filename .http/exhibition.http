@@ -1,0 +1,60 @@
+### 전시 도메인(03_전시.md) — 로컬 데모 호출 모음
+### 사용법: 앱을 EXHIBITION_DEMO_SEED=true 로 부팅하면 표본/MOCK 전시가 적재된다.
+###   EXHIBITION_DEMO_SEED=true ./gradlew bootRun
+### 브라우저 데모 페이지: http://localhost:8080/exhibitions.html
+
+@host = http://localhost:8080
+### 로그인 후 발급받은 access 토큰을 붙여넣어 CUSTOM 관련 호출에 사용한다.
+@accessToken = PASTE_ACCESS_TOKEN
+
+### 목록/탐색 — 필터 없음(오늘 진행 중, 비로그인은 CATALOG만)
+GET {{host}}/api/v1/exhibitions
+
+### 목록 — 키워드 검색
+GET {{host}}/api/v1/exhibitions?keyword=모네
+
+### 목록 — 지역+카테고리 필터
+GET {{host}}/api/v1/exhibitions?region=SEOUL&category=PHOTO
+
+### 목록 — 특정 날짜에 진행 중
+GET {{host}}/api/v1/exhibitions?date=2026-07-01
+
+### 목록 — 페이지네이션·정렬
+GET {{host}}/api/v1/exhibitions?page=0&size=10&sort=startDate,DESC
+
+### 목록 — 로그인 상태(본인 CUSTOM 포함)
+GET {{host}}/api/v1/exhibitions
+Authorization: Bearer {{accessToken}}
+
+### 상세 — CATALOG(공개). id는 목록 응답의 exhibitionId 사용
+GET {{host}}/api/v1/exhibitions/1
+
+### 상세 — 존재하지 않는 전시 → 404 NOT_FOUND
+GET {{host}}/api/v1/exhibitions/99999999
+
+### 개인 전시 등록 — 인증 필요(성공 200, type=CUSTOM)
+POST {{host}}/api/v1/exhibitions/custom
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "title": "동네 골목 사진전",
+  "place": "성수동 카페",
+  "startDate": "2026-06-20",
+  "endDate": "2026-06-30",
+  "region": "SEOUL",
+  "category": "PHOTO"
+}
+
+### 개인 전시 등록 — 미인증 → 401
+POST {{host}}/api/v1/exhibitions/custom
+Content-Type: application/json
+
+{ "title": "무단 등록" }
+
+### 개인 전시 등록 — 종료일<시작일 → 400 INVALID_INPUT
+POST {{host}}/api/v1/exhibitions/custom
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{ "title": "기간 역전", "startDate": "2026-06-30", "endDate": "2026-06-20" }
