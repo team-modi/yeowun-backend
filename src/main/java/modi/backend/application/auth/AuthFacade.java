@@ -31,6 +31,9 @@ import modi.backend.support.error.CoreException;
 @RequiredArgsConstructor
 public class AuthFacade {
 
+	/** 게스트 로그인 시 토큰 provider 클레임 값. 소셜(kakao/google)과 구분한다. */
+	public static final String GUEST_PROVIDER = "guest";
+
 	private final List<OAuthClient> oauthClients; // provider 전략들(주입)
 	private final UserRepository userRepository;
 	private final SocialAccountRepository socialAccountRepository;
@@ -69,6 +72,19 @@ public class AuthFacade {
 		AuthTokens tokens = tokenProvider.issue(user, target.code());
 		refreshTokenStore.save(user.getId(), tokens.refreshToken());
 		return AuthResult.Login.of(user, target.code(), social.getEmail(), tokens);
+	}
+
+	/**
+	 * 게스트 로그인: 소셜 연결 없이 임시 사용자를 만들고 자체 토큰을 발급한다.
+	 * 소셜 로그인과 동일한 토큰 체계를 쓰므로 발급된 access 토큰으로 기록 등 로그인 전용 API를 그대로 사용할 수 있다.
+	 * refresh도 저장해 재발급(회전)을 지원한다. 소셜 계정이 없으므로 email은 null.
+	 */
+	@Transactional
+	public AuthResult.Login guestLogin() {
+		User user = userRepository.save(User.createGuest());
+		AuthTokens tokens = tokenProvider.issue(user, GUEST_PROVIDER);
+		refreshTokenStore.save(user.getId(), tokens.refreshToken());
+		return AuthResult.Login.of(user, GUEST_PROVIDER, null, tokens);
 	}
 
 	/** refresh 검증 통과 시 access/refresh 재발급(회전). */

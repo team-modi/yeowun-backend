@@ -15,6 +15,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import modi.backend.application.auth.AuthFacade;
+import modi.backend.application.auth.AuthResult;
 import modi.backend.config.CookieProperties;
 import modi.backend.config.OAuthProperties;
 
@@ -35,6 +36,25 @@ class AuthV1ControllerTest {
 
 	@MockitoBean
 	CookieProperties cookieProperties;
+
+	@Test
+	@DisplayName("게스트 로그인 → 200 + accessToken(provider=guest)")
+	void guestLogin_성공() throws Exception {
+		given(authFacade.guestLogin()).willReturn(new AuthResult.Login(
+				42L, "게스트", null, false, "guest", null, null, null, "guest-access-token", "guest-refresh-token"));
+		given(cookieProperties.secure()).willReturn(false);
+		given(cookieProperties.sameSite()).willReturn("Lax");
+		given(authFacade.accessTtlSeconds()).willReturn(3600L);
+		given(authFacade.refreshTtlSeconds()).willReturn(1209600L);
+
+		mockMvc.perform(post("/api/v1/auth/guest"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.meta.result").value("SUCCESS"))
+				.andExpect(jsonPath("$.data.accessToken").value("guest-access-token"))
+				.andExpect(jsonPath("$.data.user.userId").value(42))
+				.andExpect(jsonPath("$.data.user.provider").value("guest"))
+				.andExpect(jsonPath("$.data.user.nickname").value("게스트"));
+	}
 
 	@Test
 	@DisplayName("허용되지 않은 redirectUri → 400 INVALID_REDIRECT_URI")

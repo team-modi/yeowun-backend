@@ -124,6 +124,45 @@ class AuthFlowIntegrationTest {
 	}
 
 	@Test
+	@DisplayName("게스트 로그인 → 소셜 없이 토큰 발급(provider=guest, email=null) + 그 토큰으로 로그인 전용 /users/me 접근")
+	void 게스트_로그인_후_로그인전용_API_사용() throws Exception {
+		// 1) 게스트 로그인: 소셜 인증 없이 임시 사용자 생성 + 자체 JWT 발급(가입 겸용)
+		MvcResult guest = mockMvc.perform(post("/api/v1/auth/guest"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.meta.result").value("SUCCESS"))
+				.andExpect(jsonPath("$.data.accessToken").isNotEmpty())
+				.andExpect(jsonPath("$.data.user.provider").value("guest"))
+				.andExpect(jsonPath("$.data.user.nickname").value("게스트"))
+				.andExpect(jsonPath("$.data.user.email").value(nullValue()))
+				.andExpect(jsonPath("$.data.user.profileCompleted").value(false))
+				.andReturn();
+		String body = guest.getResponse().getContentAsString();
+		String accessToken = JsonPath.read(body, "$.data.accessToken");
+		Integer userId = JsonPath.read(body, "$.data.user.userId");
+
+		// access·refresh 모두 HttpOnly 쿠키로 내려간다(소셜 로그인과 동일 체계)
+		assertThat(setCookie(guest, "access_token")).isNotNull().contains("HttpOnly");
+		assertThat(setCookie(guest, "refresh_token")).isNotNull().contains("HttpOnly");
+
+		// 2) 발급된 게스트 토큰으로 로그인 전용 API(/users/me) 정상 접근
+		mockMvc.perform(get("/api/v1/users/me").header("Authorization", "Bearer " + accessToken))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.userId").value(userId))
+				.andExpect(jsonPath("$.data.provider").value("guest"))
+				.andExpect(jsonPath("$.data.nickname").value("게스트"));
+	}
+
+	@Test
+	@DisplayName("게스트 로그인은 호출할 때마다 새 사용자를 생성한다(userId 상이)")
+	void 게스트_로그인_매번_새_사용자() throws Exception {
+		Integer first = JsonPath.read(mockMvc.perform(post("/api/v1/auth/guest"))
+				.andExpect(status().isOk()).andReturn().getResponse().getContentAsString(), "$.data.user.userId");
+		Integer second = JsonPath.read(mockMvc.perform(post("/api/v1/auth/guest"))
+				.andExpect(status().isOk()).andReturn().getResponse().getContentAsString(), "$.data.user.userId");
+		assertThat(first).isNotEqualTo(second);
+	}
+
+	@Test
 	@DisplayName("로그아웃 → access·refresh 쿠키 만료(Max-Age=0) + refresh 폐기로 재발급 불가")
 	void 로그아웃_쿠키만료_refresh폐기() throws Exception {
 		given(kakaoApi.getToken(any())).willReturn(Map.of("access_token", "kakao-access-token"));

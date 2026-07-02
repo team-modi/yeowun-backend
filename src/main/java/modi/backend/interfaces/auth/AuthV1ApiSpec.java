@@ -28,6 +28,15 @@ public interface AuthV1ApiSpec {
 			AuthDto.LoginRequest request,
 			@Parameter(hidden = true) HttpServletResponse response);
 
+	@Operation(summary = "게스트 로그인", description = """
+			소셜 인증 없이 임시 사용자를 즉시 생성하고 자체 JWT를 발급한다(가입 겸용).
+			- 요청 body 없음. 호출할 때마다 새 게스트 사용자가 생성된다(닉네임 "게스트", 프로필 미완).
+			- 응답: 소셜 로그인과 동일하게 `access`·`refresh` 토큰을 **HttpOnly 쿠키**로 내려주고, `accessToken`은 본문에도 함께 반환한다.
+			- 이 토큰으로 기록 등 **로그인 전용 API를 그대로 호출**할 수 있다. 이후 프로필 수정(`PUT /api/v1/users/me/profile`)으로 정보를 채울 수 있다.
+			- `provider`는 `guest`로 내려간다. 성공은 항상 200(프로젝트 컨벤션).""")
+	ResponseEntity<ApiResponse<AuthDto.TokenResponse>> guestLogin(
+			@Parameter(hidden = true) HttpServletResponse response);
+
 	@Operation(summary = "토큰 재발급", description = """
 			access 토큰이 만료(401)됐을 때 호출한다. `refresh_token` **쿠키**를 읽어 검증하고 access·refresh를 회전 발급해 두 쿠키를 다시 내려준다.
 			- 별도 요청 body 없음(쿠키만 필요). `credentials: 'include'`로 호출.

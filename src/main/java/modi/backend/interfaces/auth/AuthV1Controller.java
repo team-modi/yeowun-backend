@@ -51,6 +51,14 @@ public class AuthV1Controller implements AuthV1ApiSpec {
 	}
 
 	@Override
+	@PostMapping("/guest")
+	public ResponseEntity<ApiResponse<AuthDto.TokenResponse>> guestLogin(HttpServletResponse response) {
+		AuthResult.Login result = authFacade.guestLogin();
+		setAuthCookies(response, result);
+		return ResponseEntity.ok(ApiResponse.success(AuthDto.TokenResponse.from(result)));
+	}
+
+	@Override
 	@PostMapping("/refresh")
 	public ResponseEntity<ApiResponse<AuthDto.TokenResponse>> refresh(
 			@CookieValue(name = "refresh_token", required = false) String refreshToken,
