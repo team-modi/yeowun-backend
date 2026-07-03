@@ -68,6 +68,14 @@ public class User extends BaseEntity {
 		return createFromSocial(nickname, AgeGroup.UNSPECIFIED, null);
 	}
 
+	/**
+	 * 게스트 로그인용: 소셜 연결 없이 임시 사용자를 만든다.
+	 * 닉네임은 "게스트", 이름·연령대·출생연도 미상(프로필 미완). 소셜 로그인과 동일하게 이후 프로필 수정으로 채운다.
+	 */
+	public static User createGuest() {
+		return new User("게스트", null, AgeGroup.UNSPECIFIED, null);
+	}
+
 	/** 소셜 가입 시: nickname(없으면 기본값)·연령대·출생연도를 소셜 프로필에서 받아 채운다. 프로필은 미완 상태. */
 	public static User createFromSocial(String nickname, AgeGroup ageGroup, Integer birthYear) {
 		return createFromSocial(nickname, null, ageGroup, birthYear);

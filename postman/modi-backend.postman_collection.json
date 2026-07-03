@@ -1,0 +1,676 @@
+{
+  "info": {
+    "_postman_id": "b7e2c1a0-6d3e-4a1b-9f5c-modi-backend-001",
+    "name": "Modi Backend API",
+    "description": "Modi 백엔드 전체 검수용 컬렉션(Auth·User·Exhibition·Record).\n\n인증 방식: 게스트 로그인(POST /api/v1/auth/guest)으로 accessToken을 발급받아 컬렉션 레벨 Bearer 인증({{accessToken}})으로 모든 로그인 전용 요청에 자동 첨부한다.\n\n권장 실행 순서(Run collection): 위에서 아래로. Auth ▸ Guest Login → User → Exhibition ▸ Register Custom Exhibition → Record. 각 단계가 accessToken·exhibitionId·recordId를 환경변수로 넘겨주므로 전체가 한 번에 통과한다.\n\nbaseUrl 기본값은 http://localhost:18080 (Docker API 서버).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "01 Health",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/actuator/health",
+        "auth": {
+          "type": "noauth"
+        },
+        "description": "서버 헬스 체크. 인증 불필요."
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('health is UP', function () {",
+              "  pm.response.to.have.status(200);",
+              "  pm.expect(pm.response.json().status).to.eql('UP');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 OpenAPI Docs",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/v3/api-docs",
+        "auth": {
+          "type": "noauth"
+        },
+        "description": "OpenAPI 문서 노출 + 게스트 로그인 경로 문서화 확인. 인증 불필요."
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('auth/record paths are documented', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const paths = pm.response.json().paths;",
+              "  pm.expect(paths).to.have.property('/api/v1/auth/guest');",
+              "  pm.expect(paths).to.have.property('/api/v1/records');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "description": "게스트/소셜 로그인 · 토큰 재발급 · 로그아웃",
+      "item": [
+        {
+          "name": "01 Guest Login",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/auth/guest",
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "게스트 로그인. 소셜 인증 없이 임시 사용자를 만들고 자체 JWT를 발급한다. 응답의 accessToken을 환경변수에 저장해 이후 로그인 전용 요청에서 Bearer로 사용한다. refresh_token 은 HttpOnly 쿠키로 내려가며 Postman 쿠키 저장소에 보관돼 재발급에 쓰인다."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('guest login issues token', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.meta.result).to.eql('SUCCESS');",
+                  "  pm.expect(json.data.accessToken).to.be.a('string').and.not.empty;",
+                  "  pm.expect(json.data.user.provider).to.eql('guest');",
+                  "  pm.expect(json.data.user.nickname).to.eql('게스트');",
+                  "  pm.environment.set('accessToken', json.data.accessToken);",
+                  "  pm.environment.set('userId', json.data.user.userId);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 Social Login (Kakao) - 참고용",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/auth/login/kakao",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"PASTE_REAL_AUTH_CODE\",\n  \"redirectUri\": \"http://localhost:3000/login\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "FE 주도 소셜 로그인 참고 요청. 실제 호출하려면 body의 code를 카카오 콜백에서 받은 실제 인가 코드로, redirectUri를 화이트리스트에 등록된 값으로 교체해야 한다(그 전에는 400/502 응답이 정상). provider는 kakao | google."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('responds with API envelope', function () {",
+                  "  pm.expect(pm.response.json()).to.have.property('meta');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 Refresh Token",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/auth/refresh",
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "access 토큰 만료 시 호출. refresh_token 쿠키(게스트/소셜 로그인 시 저장됨)를 읽어 access·refresh를 회전 발급한다. 새 accessToken을 환경변수에 다시 저장한다."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('token reissued', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.data.accessToken).to.be.a('string').and.not.empty;",
+                  "  pm.environment.set('accessToken', json.data.accessToken);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "User",
+      "description": "내 프로필 조회 · 수정(온보딩)",
+      "item": [
+        {
+          "name": "01 Get My Profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/users/me",
+            "description": "내 프로필 + 취향 키워드 + 활동 통계 조회. 게스트 로그인 사용자도 동일하게 조회된다(provider=guest)."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('profile fetched', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const d = pm.response.json().data;",
+                  "  pm.expect(d.userId).to.eql(Number(pm.environment.get('userId')));",
+                  "  pm.expect(d.provider).to.eql('guest');",
+                  "  pm.expect(d).to.have.property('stats');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 Update My Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/users/me/profile",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nickname\": \"모디유저\",\n  \"ageGroup\": \"TWENTIES\",\n  \"residenceRegion\": \"SEOUL\",\n  \"residenceDistrict\": \"성동구\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "프로필 부분 갱신(전달된 필드만). 성공 시 profileCompleted=true."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('profile updated', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const d = pm.response.json().data;",
+                  "  pm.expect(d.nickname).to.eql('모디유저');",
+                  "  pm.expect(d.profileCompleted).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Exhibition",
+      "description": "전시 목록 · 상세 · 개인 전시 등록",
+      "item": [
+        {
+          "name": "01 List Exhibitions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/exhibitions?sort=latest&page=0&size=20",
+            "description": "전시 목록/탐색. 공개 API(로그인 시 CUSTOM 반영). keyword·date·region·category 필터 + sort(latest|ending|popular)."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('exhibition list', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().data.content).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 Register Custom Exhibition",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/exhibitions/custom",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"포스트맨 검수 전시\",\n  \"place\": \"성수 갤러리\",\n  \"startDate\": \"2026-06-01\",\n  \"endDate\": \"2026-06-30\",\n  \"region\": \"SEOUL\",\n  \"category\": \"PHOTO\",\n  \"posterUrl\": \"https://cdn.modi.app/exhibitions/postman/poster.jpg\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "개인 전시(CUSTOM) 등록. 인증 필수. 등록된 exhibitionId를 환경변수에 저장해 기록 생성에서 사용한다."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('custom exhibition registered', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const d = pm.response.json().data;",
+                  "  pm.expect(d.type).to.eql('CUSTOM');",
+                  "  pm.expect(d.exhibitionId).to.be.a('number');",
+                  "  pm.environment.set('exhibitionId', d.exhibitionId);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 Get Exhibition Detail",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/exhibitions/{{exhibitionId}}",
+            "description": "전시 상세. CATALOG는 공개, CUSTOM은 등록자 본인만 조회 가능(타인 403)."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('exhibition detail', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const d = pm.response.json().data;",
+                  "  pm.expect(d.exhibitionId).to.eql(Number(pm.environment.get('exhibitionId')));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Record",
+      "description": "기록 CRUD · 검색 · 북마크 · 인증/검증 가드 (로그인 전용)",
+      "item": [
+        {
+          "name": "01 Create Record",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/records",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"exhibitionId\": {{exhibitionId}},\n  \"writeMode\": \"AI\",\n  \"viewedAt\": \"2026-06-15\",\n  \"content\": \"모네의 색이 따뜻해서 한참 서 있었다.\",\n  \"emotionCodes\": [\n    \"MOVED\",\n    \"CALM\"\n  ],\n  \"userKeywords\": [\n    \"색감\"\n  ],\n  \"aiKeywords\": [\n    \"따뜻한 색감\",\n    \"위로\"\n  ],\n  \"aiSummary\": \"평온하고 뭉클한 관람.\",\n  \"representativeEmotion\": \"MOVED\",\n  \"cardPhrase\": \"그날, 색이 나를 붙잡았다\",\n  \"media\": [\n    {\n      \"type\": \"PHOTO\",\n      \"url\": \"https://example.com/image.jpg\",\n      \"sortOrder\": 0,\n      \"sizeBytes\": 1048576\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "전시 관람 기록 작성. 로그인 전용 — Bearer 토큰의 사용자로 기록을 남긴다. 앞서 등록한 exhibitionId를 사용한다. 생성된 recordId를 환경변수에 저장한다."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('record is created', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.meta.result).to.eql('SUCCESS');",
+                  "  pm.expect(json.data.recordId).to.be.a('number');",
+                  "  pm.expect(json.data.aiStatus).to.eql('READY');",
+                  "  pm.environment.set('recordId', json.data.recordId);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 Get Record Detail",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/records/{{recordId}}",
+            "description": "본인 기록 상세 조회."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('record detail', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const d = pm.response.json().data;",
+                  "  pm.expect(d.content).to.include('모네');",
+                  "  pm.expect(d.exhibitionTitle).to.eql('포스트맨 검수 전시');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 Search Records",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/records?keyword=모네&emotion=MOVED&page=0&size=20",
+            "description": "내 기록 목록 조회(본인 기록만). keyword·emotion 등 필터."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('search returns my record', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().data.content.length).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 Visited Exhibitions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/records/exhibitions/visited?page=0&size=20",
+            "description": "내가 기록을 남긴 전시 목록."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('visited list', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().data.content).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 Update Record",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/records/{{recordId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"viewedAt\": \"2026-06-16\",\n  \"content\": \"다시 보니 모네의 붓질이 더 좋았다.\",\n  \"emotionCodes\": [\n    \"CALM\"\n  ],\n  \"userKeywords\": [\n    \"수정\"\n  ],\n  \"aiKeywords\": [],\n  \"aiSummary\": \"수정된 요약\",\n  \"representativeEmotion\": \"CALM\",\n  \"cardPhrase\": \"다시 남긴 여운\",\n  \"media\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "본인 기록의 감상·감정·키워드·미디어 교체."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('record updated', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const d = pm.response.json().data;",
+                  "  pm.expect(d.content).to.include('붓질');",
+                  "  pm.expect(d.emotionCodes[0]).to.eql('CALM');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "06 Bookmark Record",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/records/{{recordId}}/bookmark",
+            "description": "본인 기록 북마크(멱등)."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('bookmarked', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().data.bookmarked).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "07 Unbookmark Record",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/records/{{recordId}}/bookmark",
+            "description": "본인 기록 북마크 해제(멱등)."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('unbookmarked', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().data.bookmarked).to.eql(false);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "08 Reject Video Over 100MB",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/records",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"exhibitionId\": {{exhibitionId}},\n  \"writeMode\": \"DIRECT\",\n  \"viewedAt\": \"2026-06-15\",\n  \"content\": \"영상이 큰 기록\",\n  \"emotionCodes\": [\n    \"MOVED\"\n  ],\n  \"media\": [\n    {\n      \"type\": \"VIDEO\",\n      \"url\": \"https://example.com/video.mp4\",\n      \"sortOrder\": 0,\n      \"sizeBytes\": 104857601\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "영상 100MB 초과는 400 INVALID_MEDIA로 거절(미디어 검증이 전시 조회보다 먼저)."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('rejects oversized video', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "  pm.expect(pm.response.json().meta.errorCode).to.eql('INVALID_MEDIA');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "09 Reject Without Token",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/records",
+            "auth": {
+              "type": "noauth"
+            },
+            "description": "토큰 없이 기록 API 호출 → 401 NO_ACCESS_TOKEN. 인증이 실제로 강제됨을 확인."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('unauthorized without token', function () {",
+                  "  pm.response.to.have.status(401);",
+                  "  pm.expect(pm.response.json().meta.errorCode).to.eql('NO_ACCESS_TOKEN');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "10 Delete Record",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/records/{{recordId}}",
+            "description": "본인 기록 소프트 삭제."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('record deleted', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().meta.result).to.eql('SUCCESS');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "11 Get Deleted Record Returns 404",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/records/{{recordId}}",
+            "description": "삭제된 기록 상세 조회 → 404 NOT_FOUND."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('deleted record is gone', function () {",
+                  "  pm.response.to.have.status(404);",
+                  "  pm.expect(pm.response.json().meta.errorCode).to.eql('NOT_FOUND');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

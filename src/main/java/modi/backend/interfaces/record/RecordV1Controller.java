@@ -45,7 +45,7 @@ public class RecordV1Controller {
 
 	@PostMapping
 	@ResponseStatus(HttpStatus.CREATED)
-	@Operation(summary = "기록 작성", description = "전시 관람 기록을 작성한다. 개발 중에는 X-User-Id 헤더로 사용자를 식별한다.")
+	@Operation(summary = "기록 작성", description = "전시 관람 기록을 작성한다. 로그인 전용 — access 토큰(쿠키/Bearer)의 사용자로 기록을 남긴다. 게스트 로그인 사용자도 동일하게 사용할 수 있다.")
 	public ApiResponse<RecordCreateResponse> create(
 			@Parameter(hidden = true) @Authentication LoginUser loginUser,
 			@Valid @RequestBody RecordCreateRequest request) {
