@@ -30,6 +30,9 @@ class RecordAiFacadeTest {
 	@Mock
 	ExhibitionFacade exhibitionFacade;
 
+	@Mock
+	AiRateLimiter aiRateLimiter;
+
 	@InjectMocks
 	RecordAiFacade facade;
 
@@ -56,6 +59,18 @@ class RecordAiFacadeTest {
 		RecordAiResult.Questions result = facade.questions(new RecordAiCriteria.Questions(1L, 10L));
 
 		assertThat(result.questions()).containsExactly("첫 질문", "둘째 질문", "셋째 질문");
+	}
+
+	@Test
+	@DisplayName("questions — 모델이 3개를 초과해 반환해도 3개로 자른다")
+	void questions_3개초과_클램프() {
+		given(exhibitionFacade.getForSnapshot(any(), any())).willReturn(detail());
+		given(aiChatClient.complete(anyString(), anyString()))
+				.willReturn("[\"q1\",\"q2\",\"q3\",\"q4\",\"q5\"]");
+
+		RecordAiResult.Questions result = facade.questions(new RecordAiCriteria.Questions(1L, 10L));
+
+		assertThat(result.questions()).containsExactly("q1", "q2", "q3");
 	}
 
 	@Test

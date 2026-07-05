@@ -26,12 +26,17 @@ public class RecordAiFacade {
 	/** 감상문 본문 최대 길이(와이어프레임 0/300). */
 	private static final int CONTENT_MAX_LENGTH = 300;
 
+	/** 생성할 질문 개수. */
+	private static final int QUESTION_COUNT = 3;
+
 	private final AiChatClient aiChatClient;
 	private final ExhibitionFacade exhibitionFacade;
+	private final AiRateLimiter aiRateLimiter;
 	private final ObjectMapper objectMapper = new ObjectMapper();
 
 	/** 전시 맥락 기반 질문 3개 생성. "다른 질문 보기"는 이 호출을 다시 하면 된다. */
 	public RecordAiResult.Questions questions(RecordAiCriteria.Questions criteria) {
+		aiRateLimiter.check(criteria.userId());
 		ExhibitionResult.Detail exhibition = exhibitionFacade.getForSnapshot(criteria.exhibitionId(), criteria.userId());
 		String system = """
 				너는 전시 관람 감상을 이끌어내는 다정한 인터뷰어야.
@@ -48,6 +53,7 @@ public class RecordAiFacade {
 		if (criteria.answers() == null || criteria.answers().isEmpty()) {
 			throw new CoreException(AiErrorCode.AI_GENERATION_FAILED, "답변이 비어 있습니다.");
 		}
+		aiRateLimiter.check(criteria.userId());
 		ExhibitionResult.Detail exhibition = exhibitionFacade.getForSnapshot(criteria.exhibitionId(), criteria.userId());
 		String system = """
 				너는 사용자의 답변을 따뜻하고 진솔한 1인칭 감상문으로 다듬는 작가야.
@@ -93,7 +99,10 @@ public class RecordAiFacade {
 		if (questions.isEmpty()) {
 			throw new CoreException(AiErrorCode.AI_GENERATION_FAILED, "질문을 생성하지 못했습니다.");
 		}
-		return questions;
+		// 모델이 3개를 초과해 반환해도 계약(질문 3개)을 넘지 않게 자른다.
+		return questions.size() > QUESTION_COUNT
+				? new ArrayList<>(questions.subList(0, QUESTION_COUNT))
+				: questions;
 	}
 
 	private List<String> tryParseJsonArray(String raw) {
