@@ -57,7 +57,13 @@ jobs:
           # spring-boot-docker-compose가 developmentOnly로 클래스패스에 있으므로,
           # CI에선 compose 기동 시도를 끈다(스펙 덤프에 불필요).
           SPRING_DOCKER_COMPOSE_ENABLED: 'false'
-          # 부팅 필수 env는 application.yaml 기본값으로 충족됨(JWT/OAuth/culture 모두 default 보유).
+          # JWT/OAuth 시크릿을 application.yaml 기본값 대신 레포 시크릿에서 주입한다.
+          # 스펙 덤프 결과엔 값이 무관하지만, 실제 부팅과 동일한 구성으로 맞춰 둔다
+          # (컨트롤러/빈이 유효한 시크릿을 요구하도록 바뀌어도 CI가 안 깨지게).
+          # 공개성 값(client-id·redirect-uri·scope·CORS)과 culture 키는 yaml 기본값 유지.
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          KAKAO_CLIENT_SECRET: ${{ secrets.KAKAO_CLIENT_SECRET }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
         run: |
           chmod +x gradlew
           ./gradlew bootRun --no-daemon &
