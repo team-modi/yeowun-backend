@@ -7,7 +7,8 @@ import modi.backend.support.error.ErrorCode;
 public enum AiErrorCode implements ErrorCode {
 
 	AI_DISABLED(HttpStatus.SERVICE_UNAVAILABLE, "AI_DISABLED", "AI 기능이 설정되지 않았습니다."),
-	AI_GENERATION_FAILED(HttpStatus.BAD_GATEWAY, "AI_GENERATION_FAILED", "AI 응답 생성에 실패했습니다.");
+	AI_GENERATION_FAILED(HttpStatus.BAD_GATEWAY, "AI_GENERATION_FAILED", "AI 응답 생성에 실패했습니다."),
+	AI_RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "AI_RATE_LIMITED", "잠시 후 다시 시도해 주세요.");
 
 	private final HttpStatus status;
 	private final String code;
