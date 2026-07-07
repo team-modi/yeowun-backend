@@ -16,6 +16,10 @@ public interface RecordJpaRepository extends JpaRepository<Record, Long> {
 
 	Optional<Record> findByIdAndDeletedAtIsNull(Long id);
 
+	/** 감정까지 즉시 로딩해 반환(리마인드에서 원본 감정을 세션 밖에서 안전히 읽기 위함). */
+	@Query("select distinct r from Record r left join fetch r.emotions where r.id = :id and r.deletedAt is null")
+	Optional<Record> findByIdWithEmotions(@Param("id") Long id);
+
 	@Query("""
 			select distinct r
 			from Record r
