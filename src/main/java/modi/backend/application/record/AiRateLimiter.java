@@ -26,14 +26,25 @@ public class AiRateLimiter {
 
 	/** 직전 허용 호출로부터 최소 간격이 지나지 않았으면 {@link AiErrorCode#AI_RATE_LIMITED}(429). */
 	public void check(Long userId) {
+		if (!tryAcquire(userId)) {
+			throw new CoreException(AiErrorCode.AI_RATE_LIMITED);
+		}
+	}
+
+	/**
+	 * 호출을 예외 없이 허용/거부한다. 허용이면 호출 시각을 갱신하고 {@code true},
+	 * 쿨다운 중이면 {@code false}. AI가 부가 기능이라 실패해도 본 작업(저장 등)은 진행해야 하는 곳에서 쓴다.
+	 */
+	public boolean tryAcquire(Long userId) {
 		if (minIntervalMs <= 0 || userId == null) {
-			return;
+			return true;
 		}
 		long now = System.currentTimeMillis();
 		Long previous = lastCallAtMs.get(userId);
 		if (previous != null && now - previous < minIntervalMs) {
-			throw new CoreException(AiErrorCode.AI_RATE_LIMITED);
+			return false;
 		}
 		lastCallAtMs.put(userId, now);
+		return true;
 	}
 }
