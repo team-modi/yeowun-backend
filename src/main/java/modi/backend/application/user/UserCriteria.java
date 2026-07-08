@@ -19,4 +19,8 @@ public final class UserCriteria {
 	public record ProfileUpdate(Long userId, String provider, String nickname, String profileImageUrl,
 			String ageGroup, String residenceRegion, String residenceDistrict) {
 	}
+
+	/** 알림 설정 수정 입력. userId는 인증에서, 수신 여부는 요청에서 채운다. */
+	public record NotificationUpdate(Long userId, boolean remindEnabled, boolean noticeEnabled) {
+	}
 }

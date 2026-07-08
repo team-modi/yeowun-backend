@@ -1,12 +1,13 @@
 package modi.backend.domain.exhibition;
 
+import java.time.LocalDate;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
-
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 
 /**
  * Exhibition 영속화 포트(도메인 소유). 구현은 infra(DIP). soft delete된 행은 조회에서 제외한다.
+ * 목록은 커서(키셋) 페이지네이션 — {@code searchSlice}(정렬+경계 적용)와 {@code count}(경계 없는 전체 건수)로 분리한다.
  */
 public interface ExhibitionRepository {
 
@@ -14,9 +15,24 @@ public interface ExhibitionRepository {
 
 	Optional<Exhibition> findById(Long id);
 
-	/** 조건·페이지네이션으로 전시 목록 조회. CUSTOM 노출은 {@code query.requesterId}로 필터링한다. */
-	Page<Exhibition> search(ExhibitionQuery query, Pageable pageable);
+	/**
+	 * 키셋 한 페이지 조회 — {@code query.sort} 순서로 정렬하고 {@code cursorKey/cursorId} 이후 행만 본다.
+	 * hasNext 판단을 위해 {@code limitPlusOne}(=size+1)개까지 가져온다. CUSTOM 노출은 {@code requesterId}로 필터링.
+	 */
+	List<Exhibition> searchSlice(ExhibitionQuery query, int limitPlusOne);
+
+	/** 커서 경계를 뺀 필터 전체 건수(totalCount용). */
+	long count(ExhibitionQuery query);
+
+	/** 필터에 맞는 후보 전체(정렬·커서 미적용). 거리순처럼 앱 레이어에서 정렬·페이징하는 경로용. */
+	List<Exhibition> searchAll(ExhibitionQuery query);
 
 	/** CATALOG 동기화 upsert용 — 원천 식별자로 기존 행 조회. */
 	Optional<Exhibition> findByExternalId(String externalId);
+
+	/** 살아있는 전시들을 id 집합으로 일괄 조회(관심 전시 목록의 벌크 로드용). 정렬·순서 보장 없음. 빈 입력이면 빈 목록. */
+	List<Exhibition> findAllActiveByIds(Collection<Long> ids);
+
+	/** 홈 배너 후보 — {@code today} 기준 진행 중(startDate≤today≤endDate)인 CATALOG를 조회수 내림차순으로 최대 {@code limit}개. */
+	List<Exhibition> findOngoingBannerCandidates(LocalDate today, int limit);
 }

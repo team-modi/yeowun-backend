@@ -71,6 +71,6 @@ class RecordServiceTest {
 	private ExhibitionResult.Detail detailResult(String title, String type, String region) {
 		return new ExhibitionResult.Detail(1L, type, title, "http://p", LocalDate.now(), null, "예술의전당", region,
 				"PAINTING", null, null, null, null, List.of(), List.of(), null, null, null, null, null, null, null,
-				0L, null, null);
+				0L, null, null, null, false, false, false);
 	}
 }

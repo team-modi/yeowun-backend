@@ -4,9 +4,6 @@ import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.Optional;
 
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.web.PageableDefault;
-import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -24,15 +21,15 @@ import modi.backend.application.exhibition.ExhibitionResult;
 import modi.backend.interfaces.auth.Authentication;
 import modi.backend.interfaces.auth.LoginUser;
 import modi.backend.interfaces.auth.OptionalAuthentication;
+import modi.backend.interfaces.common.dto.CursorResponse;
 import modi.backend.interfaces.exhibition.dto.ExhibitionDto;
-import modi.backend.interfaces.record.dto.PageResponse;
 import modi.backend.support.error.CoreException;
 import modi.backend.support.error.ErrorType;
 import modi.backend.support.response.ApiResponse;
 
 /**
- * 전시 API(03_전시.md). 목록·상세는 공개(로그인 시 CUSTOM 반영 = 선택 인증), 개인 전시 등록은 인증 필수.
- * (프로젝트 컨벤션: 성공 200 — 등록도 200으로 응답. 04_전시_구현.md 결정사항 참고.)
+ * 전시 API(03_전시.md). 목록·상세는 공개(로그인 시 CUSTOM·개인화 반영 = 선택 인증), 개인 전시 등록은 인증 필수.
+ * 목록은 커서 페이지네이션(CursorResponse). (프로젝트 컨벤션: 성공 200 — 등록도 200으로 응답.)
  */
 @RestController
 @RequestMapping("/api/v1/exhibitions")
@@ -41,21 +38,29 @@ public class ExhibitionV1Controller implements ExhibitionV1ApiSpec {
 
 	private final ExhibitionFacade exhibitionFacade;
 
-	/** 목록/탐색. keyword·date·region·category 필터 + sort(latest|ending|popular, 기본 latest) + 페이지네이션. */
+	/** 목록/탐색. keyword·section·period·region·category·date 필터 + sort + lat/lng(distance) + 커서 페이지네이션. */
 	@Override
 	@GetMapping
-	public ResponseEntity<ApiResponse<PageResponse<ExhibitionDto.ListItemResponse>>> list(
+	public ResponseEntity<ApiResponse<CursorResponse<ExhibitionDto.ListItemResponse>>> list(
 			@RequestParam(required = false) String keyword,
-			@RequestParam(required = false) String date,
+			@RequestParam(required = false) String section,
+			@RequestParam(required = false) String period,
 			@RequestParam(required = false) String region,
 			@RequestParam(required = false) String category,
+			@RequestParam(required = false) String date,
 			@RequestParam(defaultValue = "latest") String sort,
-			@ParameterObject @PageableDefault(size = 20) Pageable pageable,
+			@RequestParam(required = false) Double lat,
+			@RequestParam(required = false) Double lng,
+			@RequestParam(required = false) String cursor,
+			@RequestParam(required = false) Integer size,
 			@OptionalAuthentication Optional<LoginUser> loginUser) {
 		ExhibitionCriteria.Search criteria = new ExhibitionCriteria.Search(
-				keyword, parseDate(date), region, category, sort, requesterId(loginUser));
-		PageResponse<ExhibitionDto.ListItemResponse> data = PageResponse.from(
-				exhibitionFacade.search(criteria, pageable).map(ExhibitionDto.ListItemResponse::from));
+				keyword, section, period, region, category, parseDate(date), sort, lat, lng, cursor, size,
+				requesterId(loginUser));
+		ExhibitionResult.ListPage result = exhibitionFacade.search(criteria);
+		CursorResponse<ExhibitionDto.ListItemResponse> data = CursorResponse.of(
+				result.content().stream().map(ExhibitionDto.ListItemResponse::from).toList(),
+				result.nextCursor(), result.hasNext(), result.totalCount());
 		return ResponseEntity.ok(ApiResponse.success(data));
 	}
 
@@ -77,10 +82,18 @@ public class ExhibitionV1Controller implements ExhibitionV1ApiSpec {
 			@Authentication LoginUser user,
 			@Valid @RequestBody ExhibitionDto.CustomCreateRequest request) {
 		ExhibitionResult.Created result = exhibitionFacade.registerCustom(new ExhibitionCriteria.CustomCreate(
-				user.userId(), request.title(), request.place(), parseDate(request.startDate()),
+				user.userId(), request.title(), request.venueId(), request.place(), parseDate(request.startDate()),
 				parseDate(request.endDate()), request.region(), request.category(), request.format(),
 				request.artist(), request.posterUrl()));
 		return ResponseEntity.ok(ApiResponse.success(ExhibitionDto.CreatedResponse.from(result)));
+	}
+
+	/** 홈 배너(최대 3개). 인증 불필요(공개). 진행 중 CATALOG를 조회수 상위로 노출, 없으면 빈 배열. */
+	@Override
+	@GetMapping("/banners")
+	public ResponseEntity<ApiResponse<ExhibitionDto.BannersResponse>> banners() {
+		return ResponseEntity.ok(ApiResponse.success(
+				ExhibitionDto.BannersResponse.from(exhibitionFacade.banners())));
 	}
 
 	private static Long requesterId(Optional<LoginUser> loginUser) {

@@ -2,8 +2,6 @@ package modi.backend.interfaces.exhibition;
 
 import java.util.Optional;
 
-import org.springdoc.core.annotations.ParameterObject;
-import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
@@ -17,8 +15,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import modi.backend.interfaces.auth.LoginUser;
+import modi.backend.interfaces.common.dto.CursorResponse;
 import modi.backend.interfaces.exhibition.dto.ExhibitionDto;
-import modi.backend.interfaces.record.dto.PageResponse;
 
 /**
  * 전시 API Swagger 스펙(03_전시.md). MVC 어노테이션은 {@link ExhibitionV1Controller}.
@@ -44,6 +42,7 @@ import modi.backend.interfaces.record.dto.PageResponse;
 		| errorCode | HTTP | 의미 |
 		|---|---|---|
 		| INVALID_INPUT | 400 | 요청 파라미터/바디가 올바르지 않음(형식 오류·미정의 enum 코드 등) |
+		| INVALID_CURSOR | 400 | 커서-조건 불일치·손상된 커서 |
 		| UNAUTHORIZED | 401 | 인증(Bearer access 토큰)이 필요하거나 무효함 |
 		| FORBIDDEN | 403 | 인증은 됐으나 해당 리소스 접근 권한이 없음 |
 		| NOT_FOUND | 404 | 요청한 리소스를 찾을 수 없음 |
@@ -59,14 +58,15 @@ import modi.backend.interfaces.record.dto.PageResponse;
 public interface ExhibitionV1ApiSpec {
 
 	@Operation(summary = "전시 목록/탐색", description = """
-			필터·정렬·페이지로 전시를 조회한다. 필터 미지정 시 오늘 진행 중인 전시를 기본 노출한다.
-			비로그인은 CATALOG만, 로그인은 CATALOG + 본인 CUSTOM을 함께 본다.
+			필터·정렬·커서로 전시를 조회한다(커서 페이지네이션). 필터 미지정 시 오늘 진행 중인 전시를 기본 노출한다.
+			비로그인은 CATALOG만, 로그인은 CATALOG + 본인 CUSTOM을 함께 본다(로그인 시 bookmarked 개인화).
 			인증은 선택(Optional)이다 — Authorization 헤더가 없거나 토큰이 무효해도 401을 내지 않고
-			비로그인(익명)으로 취급해 조회를 계속한다.""")
+			비로그인(익명)으로 취급해 조회를 계속한다.
+			정렬이 바뀌면 커서를 버리고 처음부터 재조회한다(커서의 정렬 판별자와 sort가 다르면 INVALID_CURSOR).""")
 	@ApiResponses({
 			@ApiResponse(responseCode = "200", description = "조회 성공", content = @Content(
 					mediaType = MediaType.APPLICATION_JSON_VALUE,
-					schema = @Schema(implementation = PageResponse.class),
+					schema = @Schema(implementation = CursorResponse.class),
 					examples = @ExampleObject(name = "목록 조회 성공", value = """
 							{
 							  "meta": { "result": "SUCCESS", "errorCode": null, "message": null },
@@ -81,51 +81,52 @@ public interface ExhibitionV1ApiSpec {
 							        "endDate": "2026-08-31",
 							        "place": "예술의전당 한가람미술관",
 							        "region": "SEOUL",
-							        "category": "PAINTING"
-							      },
-							      {
-							        "exhibitionId": 108,
-							        "type": "CUSTOM",
-							        "title": "친구와 다녀온 사진전",
-							        "posterUrl": null,
-							        "startDate": "2026-06-20",
-							        "endDate": "2026-06-25",
-							        "place": "성수 갤러리",
-							        "region": "SEOUL",
-							        "category": "PHOTO"
+							        "category": "PAINTING",
+							        "artistSummary": null,
+							        "dDay": 5,
+							        "free": false,
+							        "bookmarked": false
 							      }
 							    ],
-							    "page": 0,
-							    "size": 20,
-							    "totalElements": 2,
-							    "totalPages": 1,
-							    "hasNext": false
+							    "nextCursor": "eyJzb3J0IjoibGF0ZXN0IiwibGFzdElkIjo1MX0",
+							    "hasNext": true,
+							    "totalCount": 160
 							  }
 							}
 							"""))),
-			@ApiResponse(responseCode = "400", description = "INVALID_INPUT — region/category가 정의되지 않은 코드이거나, "
-					+ "date가 YYYY-MM-DD 형식이 아님", content = @Content(
+			@ApiResponse(responseCode = "400", description = "INVALID_INPUT — keyword 1글자, sort=distance인데 lat·lng 없음, "
+					+ "미정의 region/category/section 코드, date 형식 오류 / INVALID_CURSOR — 커서-정렬 불일치·손상",
+					content = @Content(
 					mediaType = MediaType.APPLICATION_JSON_VALUE,
-					examples = @ExampleObject(name = "미정의 지역 코드", value = """
+					examples = @ExampleObject(name = "거리순인데 좌표 없음", value = """
 							{
 							  "meta": { "result": "FAIL", "errorCode": "INVALID_INPUT", "message": "입력값이 올바르지 않습니다." },
 							  "data": null
 							}
 							"""))),
 	})
-	ResponseEntity<modi.backend.support.response.ApiResponse<PageResponse<ExhibitionDto.ListItemResponse>>> list(
-			@Parameter(description = "전시명·전시장명 부분 일치", example = "모네") String keyword,
+	ResponseEntity<modi.backend.support.response.ApiResponse<CursorResponse<ExhibitionDto.ListItemResponse>>> list(
+			@Parameter(description = "전시명·전시장명 부분 일치(최소 2글자)", example = "모네") String keyword,
+			@Parameter(description = "섹션 필터", schema = @Schema(allowableValues = { "ending-soon",
+					"opening-this-month", "free" }), example = "ending-soon") String section,
+			@Parameter(description = "opening-this-month 기간 범위(기본 month)",
+					schema = @Schema(allowableValues = { "month", "week" }), example = "month") String period,
+			@Parameter(description = "지역 코드 콤마 다중(SEOUL,GYEONGGI 등)", example = "SEOUL,GYEONGGI") String region,
+			@Parameter(description = "카테고리 코드 콤마 다중(PAINTING·PHOTO·MEDIA·SCULPTURE·DESIGN·CRAFT·"
+					+ "ARCHITECTURE·PERFORMANCE·ETC)", example = "PHOTO,MEDIA") String category,
 			@Parameter(description = "해당 날짜에 진행 중인 전시(YYYY-MM-DD)", example = "2026-06-30") String date,
-			@Parameter(description = "지역 코드(SEOUL·GYEONGGI·BUSAN·DAEGU·ETC 등)", example = "SEOUL") String region,
-			@Parameter(description = "카테고리 코드(PAINTING·PHOTO·MEDIA·SCULPTURE·ETC)", example = "PHOTO") String category,
-			@Parameter(description = "정렬 코드. latest=시작일 최신순(기본), ending=종료일 임박순, popular=조회수 많은순",
-					example = "latest", schema = @Schema(allowableValues = { "latest", "ending", "popular" })) String sort,
-			@ParameterObject Pageable pageable,
+			@Parameter(description = "정렬 코드. latest=시작일 최신순(기본), ending=종료일 임박순, popular=조회수 많은순, "
+					+ "distance=거리순(lat·lng 필수)", example = "latest",
+					schema = @Schema(allowableValues = { "latest", "ending", "popular", "distance" })) String sort,
+			@Parameter(description = "위도(sort=distance 필수)", example = "37.5033") Double lat,
+			@Parameter(description = "경도(sort=distance 필수)", example = "126.9575") Double lng,
+			@Parameter(description = "다음 페이지 조회용 opaque 커서(첫 페이지는 생략)") String cursor,
+			@Parameter(description = "페이지 크기(기본 20, 최대 50)", example = "20") Integer size,
 			@Parameter(hidden = true) Optional<LoginUser> loginUser);
 
 	@Operation(summary = "전시 상세", description = """
 			CATALOG는 공개, CUSTOM은 등록자 본인만 조회 가능. 인증은 선택(Optional) —
-			비로그인·무효 토큰이어도 CATALOG 전시는 정상 조회된다.""")
+			비로그인·무효 토큰이어도 CATALOG 전시는 정상 조회된다. 로그인 시 bookmarked·recorded 개인화 필드를 채운다.""")
 	@ApiResponses({
 			@ApiResponse(responseCode = "200", description = "조회 성공", content = @Content(
 					mediaType = MediaType.APPLICATION_JSON_VALUE,
@@ -145,7 +146,7 @@ public interface ExhibitionV1ApiSpec {
 							    "category": "PAINTING",
 							    "description": "인상주의 거장 모네의 대표작을 만나는 특별전.",
 							    "operatingHours": "10:00~19:00(월요일 휴관)",
-							    "price": "성인 20,000원 / 청소년 15,000원",
+							    "price": "무료",
 							    "artists": ["클로드 모네"],
 							    "keywords": ["인상주의", "회화"],
 							    "serviceName": "문화포털",
@@ -157,7 +158,11 @@ public interface ExhibitionV1ApiSpec {
 							    "phone": "02-580-1300",
 							    "viewCount": 1024,
 							    "sigungu": "서초구",
-							    "placeUrl": "https://www.sac.or.kr"
+							    "placeUrl": "https://www.sac.or.kr",
+							    "artistSummary": null,
+							    "free": true,
+							    "bookmarked": true,
+							    "recorded": false
 							  }
 							}
 							"""))),
@@ -225,4 +230,31 @@ public interface ExhibitionV1ApiSpec {
 	ResponseEntity<modi.backend.support.response.ApiResponse<ExhibitionDto.CreatedResponse>> registerCustom(
 			@Parameter(hidden = true) LoginUser user,
 			ExhibitionDto.CustomCreateRequest request);
+
+	@Operation(summary = "홈 배너 조회", description = """
+			홈 캐러셀용 배너를 최대 3개 반환한다(인증 불필요). 운영자 지정 테이블이 없어 오늘 진행 중인 CATALOG 전시를
+			조회수 상위로 채운다. bannerImageUrl은 전시 포스터 URL을 재사용한다. 배너가 없으면 빈 배열(에러 아님).""")
+	@ApiResponses({
+			@ApiResponse(responseCode = "200", description = "조회 성공(배너 없으면 빈 배열)", content = @Content(
+					mediaType = MediaType.APPLICATION_JSON_VALUE,
+					schema = @Schema(implementation = ExhibitionDto.BannersResponse.class),
+					examples = @ExampleObject(name = "배너 조회 성공", value = """
+							{
+							  "meta": { "result": "SUCCESS", "errorCode": null, "message": null },
+							  "data": {
+							    "banners": [
+							      {
+							        "exhibitionId": 3,
+							        "title": "인상주의를 넘어",
+							        "bannerImageUrl": "https://cdn.modi.app/exhibitions/3/poster.jpg",
+							        "startDate": "2026-05-28",
+							        "endDate": "2026-08-23",
+							        "place": "세종문화회관 미술관"
+							      }
+							    ]
+							  }
+							}
+							"""))),
+	})
+	ResponseEntity<modi.backend.support.response.ApiResponse<ExhibitionDto.BannersResponse>> banners();
 }

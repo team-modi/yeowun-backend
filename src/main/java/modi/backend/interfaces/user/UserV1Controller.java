@@ -1,6 +1,7 @@
 package modi.backend.interfaces.user;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -46,5 +47,34 @@ public class UserV1Controller implements UserV1ApiSpec {
 				user.userId(), user.provider(), request.nickname(), request.profileImageUrl(),
 				request.ageGroup(), request.residenceRegion(), request.residenceDistrict()));
 		return ResponseEntity.ok(ApiResponse.success(UserDto.ProfileResponse.from(result)));
+	}
+
+	/** 알림 설정 조회. */
+	@Override
+	@GetMapping("/me/notification-settings")
+	public ResponseEntity<ApiResponse<UserDto.NotificationSettingsResponse>> notificationSettings(
+			@Authentication LoginUser user) {
+		UserResult.NotificationSettings result = userFacade.getNotificationSettings(
+				new UserCriteria.Me(user.userId(), user.provider()));
+		return ResponseEntity.ok(ApiResponse.success(UserDto.NotificationSettingsResponse.from(result)));
+	}
+
+	/** 알림 설정 수정(리마인드·공지 수신 여부 전체 갱신). */
+	@Override
+	@PutMapping("/me/notification-settings")
+	public ResponseEntity<ApiResponse<UserDto.NotificationSettingsResponse>> updateNotificationSettings(
+			@Authentication LoginUser user,
+			@Valid @RequestBody UserDto.NotificationSettingsRequest request) {
+		UserResult.NotificationSettings result = userFacade.updateNotificationSettings(
+				new UserCriteria.NotificationUpdate(user.userId(), request.remindEnabled(), request.noticeEnabled()));
+		return ResponseEntity.ok(ApiResponse.success(UserDto.NotificationSettingsResponse.from(result)));
+	}
+
+	/** 회원 탈퇴(soft-delete + 토큰 무효화). 응답 data는 null. */
+	@Override
+	@DeleteMapping("/me")
+	public ResponseEntity<ApiResponse<Object>> withdraw(@Authentication LoginUser user) {
+		userFacade.withdraw(user.userId());
+		return ResponseEntity.ok(ApiResponse.success());
 	}
 }

@@ -16,11 +16,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import modi.backend.domain.bookmark.ExhibitionBookmarkRepository;
 import modi.backend.domain.exhibition.CatalogDetailData;
 import modi.backend.domain.exhibition.Exhibition;
 import modi.backend.domain.exhibition.ExhibitionCatalogClient;
 import modi.backend.domain.exhibition.ExhibitionErrorCode;
 import modi.backend.domain.exhibition.ExhibitionRepository;
+import modi.backend.infra.record.RecordJpaRepository;
 import modi.backend.support.error.CoreException;
 import modi.backend.support.error.ErrorType;
 
@@ -32,13 +34,20 @@ class ExhibitionDetailTest {
 
 	private ExhibitionRepository exhibitionRepository;
 	private ExhibitionCatalogClient catalogClient;
+	private ExhibitionBookmarkRepository bookmarkRepository;
+	private modi.backend.domain.venue.VenueRepository venueRepository;
+	private RecordJpaRepository recordJpaRepository;
 	private ExhibitionFacade facade;
 
 	@BeforeEach
 	void setUp() {
 		exhibitionRepository = mock(ExhibitionRepository.class);
 		catalogClient = mock(ExhibitionCatalogClient.class);
-		facade = new ExhibitionFacade(exhibitionRepository, catalogClient);
+		bookmarkRepository = mock(ExhibitionBookmarkRepository.class);
+		venueRepository = mock(modi.backend.domain.venue.VenueRepository.class);
+		recordJpaRepository = mock(RecordJpaRepository.class);
+		facade = new ExhibitionFacade(exhibitionRepository, catalogClient, bookmarkRepository, venueRepository,
+				recordJpaRepository);
 		given(exhibitionRepository.save(any(Exhibition.class))).willAnswer(invocation -> invocation.getArgument(0));
 	}
 
@@ -100,7 +109,8 @@ class ExhibitionDetailTest {
 	@Test
 	@DisplayName("타인의 CUSTOM 전시 조회 시 403")
 	void 상세_타인의_CUSTOM_403() {
-		Exhibition custom = Exhibition.createCustom(10L, "개인 전시", "장소", null, null, null, null, null, null, null);
+		Exhibition custom = Exhibition.createCustom(10L, "개인 전시", "장소", null, null, null, null, null, null, null,
+				null);
 		given(exhibitionRepository.findById(3L)).willReturn(Optional.of(custom));
 
 		assertThatThrownBy(() -> facade.getDetail(new ExhibitionCriteria.Detail(3L, 20L)))

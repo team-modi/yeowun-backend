@@ -8,7 +8,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
 import lombok.RequiredArgsConstructor;
@@ -44,8 +43,7 @@ public class ExhibitionDemoSeeder implements ApplicationRunner {
 
 	/** 카탈로그가 비어 있으면(키 미설정 등) 응답 전 필드를 채운 표본 + MOCK을 적재한다. */
 	private void seedSamplesIfEmpty() {
-		ExhibitionQuery catalogProbe = new ExhibitionQuery(null, null, null, null, null);
-		if (!exhibitionRepository.search(catalogProbe, PageRequest.of(0, 1)).isEmpty()) {
+		if (exhibitionRepository.count(ExhibitionQuery.unfiltered()) > 0) {
 			log.info("데모 시드: 카탈로그가 이미 존재 — 표본 적재 스킵");
 			return;
 		}

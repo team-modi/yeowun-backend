@@ -136,11 +136,15 @@ public class Exhibition extends BaseEntity {
 	@Column(name = "our_view_count", nullable = false)
 	private long ourViewCount = 0;
 
+	/** 장르 키워드(임시 랜덤, 추후 AI 분류가 대체). CUSTOM 등록 시 부여, CATALOG는 null. 상세의 keywords로 노출. */
+	@Column(name = "genre_keyword", length = 50)
+	private String genreKeyword;
+
 	private Exhibition(ExhibitionType type, String externalId, Long ownerId, String title, String place,
 			LocalDate startDate, LocalDate endDate, ExhibitionRegion region, ExhibitionCategory category,
 			ExhibitionFormat format, String artist, String posterUrl, String description, String operatingHours,
 			String price, String detailUrl, String serviceName, Double gpsX, Double gpsY, String sigungu,
-			String realmName, String areaText) {
+			String realmName, String areaText, String genreKeyword) {
 		this.type = type;
 		this.externalId = externalId;
 		this.ownerId = ownerId;
@@ -163,16 +167,21 @@ public class Exhibition extends BaseEntity {
 		this.sigungu = sigungu;
 		this.realmName = realmName;
 		this.areaText = areaText;
+		this.genreKeyword = genreKeyword;
 		validatePeriod();
+		validateSoloArtist();
 	}
 
-	/** 사용자 개인 전시(CUSTOM) 등록. 제목 필수, 기간 {@code RULE: 전시 기간} 검증. format·artist는 선택. */
+	/**
+	 * 사용자 개인 전시(CUSTOM) 등록. 제목 필수, 기간 {@code RULE: 전시 기간}·{@code RULE: 개인전 작가} 검증.
+	 * format·artist는 선택이나 {@code format=SOLO}면 artist 필수. {@code genreKeyword}는 앱 레이어가 골라 넘긴다.
+	 */
 	public static Exhibition createCustom(Long ownerId, String title, String place, LocalDate startDate,
 			LocalDate endDate, ExhibitionRegion region, ExhibitionCategory category, ExhibitionFormat format,
-			String artist, String posterUrl) {
+			String artist, String posterUrl, String genreKeyword) {
 		return new Exhibition(ExhibitionType.CUSTOM, null, ownerId, title, place, startDate, endDate,
 				region, category, format, artist, posterUrl, null, null, null, null, null, null, null, null, null,
-				null);
+				null, genreKeyword);
 	}
 
 	/** 외부 API 수집 전시(CATALOG) 생성. {@code externalId}는 동기화 upsert 기준키. */
@@ -182,7 +191,7 @@ public class Exhibition extends BaseEntity {
 			Double gpsX, Double gpsY, String sigungu, String realmName, String areaText) {
 		return new Exhibition(ExhibitionType.CATALOG, externalId, null, title, place, startDate, endDate,
 				region, category, null, null, posterUrl, description, operatingHours, price, detailUrl, serviceName,
-				gpsX, gpsY, sigungu, realmName, areaText);
+				gpsX, gpsY, sigungu, realmName, areaText, null);
 	}
 
 	/**
@@ -241,6 +250,44 @@ public class Exhibition extends BaseEntity {
 		return type == ExhibitionType.CATALOG;
 	}
 
+	/**
+	 * 무료 여부(C-6 규칙) — 가격 텍스트가 "무료"를 포함하거나, 표기된 금액이 0뿐이면 무료.
+	 * null/공백(가격 미상)은 무료로 보지 않는다. 목록 {@code free} 필드와 {@code section=free} 필터가 공유하는 단일 규칙.
+	 */
+	public static boolean isFree(String price) {
+		if (price == null || price.isBlank()) {
+			return false;
+		}
+		if (price.contains("무료")) {
+			return true;
+		}
+		String digits = price.replaceAll("[^0-9]", "");
+		return digits.matches("0+");
+	}
+
+	public boolean isFree() {
+		return isFree(this.price);
+	}
+
+	/**
+	 * 종료 D-데이(오늘로부터 종료일까지 남은 일수). 종료일이 없거나 이미 종료됐으면 null.
+	 * (오늘 == 종료일이면 D-0)
+	 */
+	public Integer dDay(LocalDate today) {
+		if (endDate == null || endDate.isBefore(today)) {
+			return null;
+		}
+		return (int) java.time.temporal.ChronoUnit.DAYS.between(today, endDate);
+	}
+
+	/** 작가 요약(목록·상세의 artistSummary). CUSTOM은 등록 작가명, CATALOG는 원천 미보유라 null. */
+	public String artistSummary() {
+		if (isCatalog() || artist == null || artist.isBlank()) {
+			return null;
+		}
+		return artist;
+	}
+
 	/** 요청자가 이 전시를 조회할 수 있는가. CATALOG는 공개, CUSTOM은 등록자 본인만. */
 	public boolean isAccessibleBy(Long requesterId) {
 		return isCatalog() || (requesterId != null && requesterId.equals(ownerId));
@@ -258,6 +305,13 @@ public class Exhibition extends BaseEntity {
 	private void validatePeriod() {
 		if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
 			throw new CoreException(ErrorType.INVALID_INPUT, "종료일이 시작일보다 앞설 수 없습니다: " + startDate + " ~ " + endDate);
+		}
+	}
+
+	/** {@code RULE: 개인전 작가} — format=SOLO(개인전)면 작가명이 필요하다. */
+	private void validateSoloArtist() {
+		if (format == ExhibitionFormat.SOLO && (artist == null || artist.isBlank())) {
+			throw new CoreException(ErrorType.INVALID_INPUT, "개인전은 작가명이 필요합니다");
 		}
 	}
 

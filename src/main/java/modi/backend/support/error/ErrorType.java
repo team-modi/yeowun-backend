@@ -10,6 +10,7 @@ public enum ErrorType implements ErrorCode {
 
 	INVALID_INPUT(HttpStatus.BAD_REQUEST, "INVALID_INPUT", "입력값이 올바르지 않습니다."),
 	INVALID_MEDIA(HttpStatus.BAD_REQUEST, "INVALID_MEDIA", "첨부할 수 없는 미디어입니다."),
+	INVALID_CURSOR(HttpStatus.BAD_REQUEST, "INVALID_CURSOR", "요청한 커서가 올바르지 않습니다."),
 	UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "인증이 필요합니다."),
 	FORBIDDEN(HttpStatus.FORBIDDEN, "FORBIDDEN", "접근 권한이 없습니다."),
 	NOT_FOUND(HttpStatus.NOT_FOUND, "NOT_FOUND", "요청한 리소스를 찾을 수 없습니다."),

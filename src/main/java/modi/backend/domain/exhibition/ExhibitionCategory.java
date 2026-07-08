@@ -10,7 +10,7 @@ import modi.backend.support.error.ErrorType;
  * 외부 API는 realmName(미술/전시 등 상위 분야)만 주므로 {@link #fromRealmName}은 휴리스틱 매핑이다.
  */
 public enum ExhibitionCategory {
-	PAINTING, PHOTO, MEDIA, SCULPTURE, ETC;
+	PAINTING, PHOTO, MEDIA, SCULPTURE, DESIGN, CRAFT, ARCHITECTURE, PERFORMANCE, ETC;
 
 	/** 클라이언트가 보낸 카테고리 코드 → enum. 미정의 코드는 {@link ErrorType#INVALID_INPUT}. */
 	public static ExhibitionCategory from(String code) {
