@@ -58,6 +58,9 @@ jobs:
             # client-id·redirect-uri·CORS는 application.yaml prod 기본값(공개 정보).
             cat > .env <<EOF
             SPRING_PROFILES_ACTIVE=prod
+            # 운영은 컨테이너를 호스트 8080으로 노출(공개 주소·아래 헬스체크 localhost:8080과 일치).
+            # compose.yaml은 기본 18090이라 이 값이 없으면 8080이 비어 배포 헬스체크가 실패한다.
+            APP_HOST_PORT=8080
             KAKAO_CLIENT_SECRET=${KAKAO_CLIENT_SECRET}
             GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
             JWT_SECRET=${JWT_SECRET}
