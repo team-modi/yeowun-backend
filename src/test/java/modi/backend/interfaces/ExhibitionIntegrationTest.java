@@ -34,8 +34,10 @@ import com.jayway.jsonpath.JsonPath;
 
 import modi.backend.TestcontainersConfiguration;
 import modi.backend.application.exhibition.ExhibitionFacade;
+import modi.backend.domain.bookmark.ExhibitionBookmarkRepository;
 import modi.backend.domain.exhibition.CatalogDetailData;
 import modi.backend.domain.exhibition.CatalogExhibitionData;
+import modi.backend.domain.exhibition.Exhibition;
 import modi.backend.domain.exhibition.ExhibitionCatalogClient;
 import modi.backend.domain.exhibition.ExhibitionCategory;
 import modi.backend.domain.exhibition.ExhibitionRegion;
@@ -43,10 +45,10 @@ import modi.backend.domain.exhibition.ExhibitionRepository;
 import modi.backend.infra.auth.KakaoApi;
 
 /**
- * 전시 도메인(03_전시.md) API end-to-end 검증.
+ * 전시 도메인(03_전시.md) API end-to-end 검증(커서 페이지네이션 CursorResponse).
  * 외부 두 경계만 목으로 둔다: 공공데이터 수집 포트({@link ExhibitionCatalogClient})와 카카오 로그인 HTTP({@link KakaoApi}).
- * 나머지(컨트롤러·Facade·Entity·DB Testcontainers)는 실제로 태운다. CATALOG는 syncCatalog로 적재해 조회한다.
- * (프로젝트 컨벤션 우선: 성공 200 — 등록도 200. artists/keywords는 원천 미제공이라 빈 배열.)
+ * 나머지(컨트롤러·Facade·Entity·DB Testcontainers)는 실제로 태운다. CATALOG는 syncCatalog 또는 리포지토리로 적재해 조회한다.
+ * DB는 메서드 간 공유되므로 신규 표본은 고유 keyword로 격리해 단언한다.
  */
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest
@@ -66,6 +68,9 @@ class ExhibitionIntegrationTest {
 
 	@Autowired
 	ExhibitionRepository exhibitionRepository;
+
+	@Autowired
+	ExhibitionBookmarkRepository exhibitionBookmarkRepository;
 
 	@MockitoBean
 	ExhibitionCatalogClient catalogClient;
@@ -93,6 +98,13 @@ class ExhibitionIntegrationTest {
 		exhibitionFacade.syncCatalog();
 	}
 
+	/** 표본 CATALOG를 리포지토리로 직접 적재(가격·좌표·기간 제어). 기본 startDate는 과거로 둬 최신순 상단을 침범하지 않게 한다. */
+	private Long saveCatalog(String externalId, String title, LocalDate startDate, LocalDate endDate,
+			ExhibitionRegion region, ExhibitionCategory category, String price, Double gpsX, Double gpsY) {
+		return exhibitionRepository.save(Exhibition.createCatalog(externalId, title, "표본 장소", startDate, endDate,
+				region, category, null, null, null, price, null, "기관", gpsX, gpsY, null, "전시", null)).getId();
+	}
+
 	private String loginAndGetAccessToken(long providerUserId, String nickname) throws Exception {
 		given(kakaoApi.getToken(any())).willReturn(Map.of("access_token", "kakao-access-token"));
 		given(kakaoApi.getUserInfo(anyString())).willReturn(Map.of(
@@ -106,19 +118,164 @@ class ExhibitionIntegrationTest {
 		return JsonPath.read(login.getResponse().getContentAsString(), "$.data.accessToken");
 	}
 
+	private long userIdOf(String accessToken) throws Exception {
+		MvcResult me = mockMvc.perform(get("/api/v1/users/me").header("Authorization", "Bearer " + accessToken))
+				.andExpect(status().isOk())
+				.andReturn();
+		return ((Number) JsonPath.read(me.getResponse().getContentAsString(), "$.data.userId")).longValue();
+	}
+
 	@Test
-	@DisplayName("GET /exhibitions — 필터 없음(비로그인), 200 + 오늘 진행 중 CATALOG만(종료 전시 제외)")
-	void 목록_기본_진행중() throws Exception {
+	@DisplayName("GET /exhibitions — 필터 없음(비로그인), 200 + 커서 shape + 신규 필드(dDay/free/bookmarked) + 오늘 진행 중만")
+	void 목록_기본_진행중_커서shape() throws Exception {
 		mockMvc.perform(get("/api/v1/exhibitions"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.meta.result").value("SUCCESS"))
 				.andExpect(jsonPath("$.data.content").isArray())
-				.andExpect(jsonPath("$.data.size").value(20))
+				.andExpect(jsonPath("$.data.hasNext").isBoolean())
+				.andExpect(jsonPath("$.data.totalCount").isNumber())
 				.andExpect(jsonPath("$.data.content[*].title", hasItem(MONET)))
 				.andExpect(jsonPath("$.data.content[*].title", hasItem(PHOTO_SHOW)))
 				// 종료된 전시(피카소)는 진행 중이 아니므로 제외
 				.andExpect(jsonPath("$.data.content[*].title", not(hasItem(PICASSO))))
-				.andExpect(jsonPath("$.data.content[?(@.title=='" + MONET + "')].type").value(hasItem("CATALOG")));
+				// 신규 필드: 비로그인이라 bookmarked 전부 false, free는 boolean
+				.andExpect(jsonPath("$.data.content[*].bookmarked", not(hasItem(true))))
+				.andExpect(jsonPath("$.data.content[?(@.title=='" + MONET + "')].free").value(hasItem(false)))
+				// dDay는 KST 기준 오늘로부터 종료일(약 +30일)까지 — 타임존 경계로 ±1 가능하므로 범위로 단언
+				.andExpect(jsonPath("$.data.content[?(@.title=='" + MONET + "')].dDay")
+						.value(hasItem(greaterThanOrEqualTo(28))));
+	}
+
+	@Test
+	@DisplayName("GET /exhibitions?keyword=한글자 — 1글자 검색어, 400 INVALID_INPUT")
+	void 목록_키워드_1글자_400() throws Exception {
+		mockMvc.perform(get("/api/v1/exhibitions").param("keyword", "네"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.meta.errorCode").value("INVALID_INPUT"));
+	}
+
+	@Test
+	@DisplayName("GET /exhibitions?region=SEOUL,GYEONGGI — 콤마 다중 지역 필터(BUSAN 제외)")
+	void 목록_다중지역_필터() throws Exception {
+		LocalDate today = LocalDate.now();
+		String kw = "지역다중표본";
+		saveCatalog("MR-SEOUL", kw + " 서울", today.minusDays(100), today.plusDays(30),
+				ExhibitionRegion.SEOUL, ExhibitionCategory.PAINTING, null, null, null);
+		saveCatalog("MR-GG", kw + " 경기", today.minusDays(100), today.plusDays(30),
+				ExhibitionRegion.GYEONGGI, ExhibitionCategory.PAINTING, null, null, null);
+		saveCatalog("MR-BUSAN", kw + " 부산", today.minusDays(100), today.plusDays(30),
+				ExhibitionRegion.BUSAN, ExhibitionCategory.PAINTING, null, null, null);
+
+		mockMvc.perform(get("/api/v1/exhibitions").param("keyword", kw).param("region", "SEOUL,GYEONGGI"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.content[*].title", hasItem(kw + " 서울")))
+				.andExpect(jsonPath("$.data.content[*].title", hasItem(kw + " 경기")))
+				.andExpect(jsonPath("$.data.content[*].title", not(hasItem(kw + " 부산"))));
+	}
+
+	@Test
+	@DisplayName("GET /exhibitions?section=ending-soon — 종료 임박(오늘~+7일)만, 먼 종료는 제외")
+	void 목록_섹션_ending_soon() throws Exception {
+		LocalDate today = LocalDate.now();
+		String kw = "종료임박표본";
+		saveCatalog("ES-SOON", kw + " 곧끝남", today.minusDays(10), today.plusDays(3),
+				ExhibitionRegion.SEOUL, ExhibitionCategory.PAINTING, null, null, null);
+		saveCatalog("ES-FAR", kw + " 여유", today.minusDays(10), today.plusDays(30),
+				ExhibitionRegion.SEOUL, ExhibitionCategory.PAINTING, null, null, null);
+
+		mockMvc.perform(get("/api/v1/exhibitions").param("keyword", kw).param("section", "ending-soon"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.content[*].title", hasItem(kw + " 곧끝남")))
+				.andExpect(jsonPath("$.data.content[*].title", not(hasItem(kw + " 여유"))));
+	}
+
+	@Test
+	@DisplayName("GET /exhibitions?section=free — 무료 전시만(유료 제외) + free=true")
+	void 목록_섹션_free() throws Exception {
+		LocalDate today = LocalDate.now();
+		String kw = "무료섹션표본";
+		saveCatalog("FR-FREE", kw + " 무료전", today.minusDays(100), today.plusDays(30),
+				ExhibitionRegion.SEOUL, ExhibitionCategory.PAINTING, "무료", null, null);
+		saveCatalog("FR-PAID", kw + " 유료전", today.minusDays(100), today.plusDays(30),
+				ExhibitionRegion.SEOUL, ExhibitionCategory.PAINTING, "성인 20,000원", null, null);
+
+		mockMvc.perform(get("/api/v1/exhibitions").param("keyword", kw).param("section", "free"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.content[*].title", hasItem(kw + " 무료전")))
+				.andExpect(jsonPath("$.data.content[*].title", not(hasItem(kw + " 유료전"))))
+				.andExpect(jsonPath("$.data.content[?(@.title=='" + kw + " 무료전')].free").value(hasItem(true)));
+	}
+
+	@Test
+	@DisplayName("GET /exhibitions — 커서 페이지네이션(size=2로 2페이지, 중복·누락 없음, 끝 페이지 nextCursor=null)")
+	void 목록_커서_페이징() throws Exception {
+		LocalDate today = LocalDate.now();
+		String kw = "커서페이징표본";
+		// startDate 내림차순(최신순)으로 c1 > c2 > c3. region은 GYEONGGI로 둬 SEOUL 정렬 테스트를 침범하지 않게 한다.
+		saveCatalog("CP-1", kw + " A", today.minusDays(1), today.plusDays(30),
+				ExhibitionRegion.GYEONGGI, ExhibitionCategory.PAINTING, null, null, null);
+		saveCatalog("CP-2", kw + " B", today.minusDays(2), today.plusDays(30),
+				ExhibitionRegion.GYEONGGI, ExhibitionCategory.PAINTING, null, null, null);
+		saveCatalog("CP-3", kw + " C", today.minusDays(3), today.plusDays(30),
+				ExhibitionRegion.GYEONGGI, ExhibitionCategory.PAINTING, null, null, null);
+
+		MvcResult page1 = mockMvc.perform(get("/api/v1/exhibitions")
+						.param("keyword", kw).param("sort", "latest").param("size", "2"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.content", hasSize(2)))
+				.andExpect(jsonPath("$.data.hasNext").value(true))
+				.andExpect(jsonPath("$.data.totalCount").value(3))
+				.andReturn();
+		String body1 = page1.getResponse().getContentAsString();
+		List<Integer> ids1 = JsonPath.read(body1, "$.data.content[*].exhibitionId");
+		String nextCursor = JsonPath.read(body1, "$.data.nextCursor");
+
+		MvcResult page2 = mockMvc.perform(get("/api/v1/exhibitions")
+						.param("keyword", kw).param("sort", "latest").param("size", "2")
+						.param("cursor", nextCursor))
+				.andExpect(status().isOk())
+				.andReturn();
+		List<Integer> ids2 = JsonPath.read(page2.getResponse().getContentAsString(), "$.data.content[*].exhibitionId");
+
+		// 중복 없음 + 합쳐서 3건(누락 없음)
+		org.assertj.core.api.Assertions.assertThat(ids1).doesNotContainAnyElementsOf(ids2);
+		org.assertj.core.api.Assertions.assertThat(ids1.size() + ids2.size()).isEqualTo(3);
+	}
+
+	@Test
+	@DisplayName("GET /exhibitions?cursor=손상 — 잘못된 커서, 400 INVALID_CURSOR")
+	void 목록_손상된_커서_400() throws Exception {
+		mockMvc.perform(get("/api/v1/exhibitions").param("sort", "latest").param("cursor", "!!!corrupt!!!"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.meta.errorCode").value("INVALID_CURSOR"));
+	}
+
+	@Test
+	@DisplayName("GET /exhibitions?sort=distance (좌표 없음) — 400 INVALID_INPUT")
+	void 목록_거리순_좌표없음_400() throws Exception {
+		mockMvc.perform(get("/api/v1/exhibitions").param("sort", "distance"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.meta.errorCode").value("INVALID_INPUT"));
+	}
+
+	@Test
+	@DisplayName("GET /exhibitions?sort=distance&lat&lng — 좌표 기준 가까운 순(가장 가까운 표본이 1위)")
+	void 목록_거리순_정렬() throws Exception {
+		LocalDate today = LocalDate.now();
+		String kw = "거리표본";
+		saveCatalog("DIST-NEAR", kw + " 가까움", today.minusDays(100), today.plusDays(30),
+				ExhibitionRegion.SEOUL, ExhibitionCategory.PAINTING, null, 127.00, 37.50);
+		saveCatalog("DIST-MID", kw + " 중간", today.minusDays(100), today.plusDays(30),
+				ExhibitionRegion.SEOUL, ExhibitionCategory.PAINTING, null, 127.50, 37.50);
+		saveCatalog("DIST-FAR", kw + " 멈", today.minusDays(100), today.plusDays(30),
+				ExhibitionRegion.SEOUL, ExhibitionCategory.PAINTING, null, 128.00, 37.50);
+
+		mockMvc.perform(get("/api/v1/exhibitions")
+						.param("keyword", kw).param("sort", "distance")
+						.param("lat", "37.50").param("lng", "127.00"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.content[0].title").value(kw + " 가까움"))
+				.andExpect(jsonPath("$.data.totalCount").value(3));
 	}
 
 	@Test
@@ -152,30 +309,30 @@ class ExhibitionIntegrationTest {
 	@Test
 	@DisplayName("GET /exhibitions?region=SEOUL&sort=latest — 시작일 최신순(시작일이 가장 늦은 사진전이 1위)")
 	void 목록_정렬_latest() throws Exception {
-		// region 필터를 함께 걸어 ongoing 기본 제한을 해제 — 종료된 피카소전도 정렬 대상에 포함시켜 3건을 모두 비교한다.
+		// region 필터를 함께 걸어 ongoing 기본 제한을 해제 — 종료된 피카소전도 정렬 대상에 포함시켜 비교한다.
 		mockMvc.perform(get("/api/v1/exhibitions").param("region", "SEOUL").param("sort", "latest"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.data.content[0].title").value(PHOTO_SHOW));
 	}
 
 	@Test
-	@DisplayName("GET /exhibitions?region=SEOUL&sort=ending — 종료일 임박순(이미 종료된 피카소전이 1위)")
-	void 목록_정렬_ending() throws Exception {
-		mockMvc.perform(get("/api/v1/exhibitions").param("region", "SEOUL").param("sort", "ending"))
+	@DisplayName("GET /exhibitions?region=SEOUL&sort=popular — 조회수순(상세를 여러 번 조회한 피카소전이 1위)")
+	void 목록_정렬_popular() throws Exception {
+		Long picassoId = exhibitionRepository.findByExternalId("CAT-PICASSO").orElseThrow().getId();
+		// 상세 GET은 매 호출마다 ourViewCount를 1씩 증가시킨다 — 5회 조회해 다른 전시보다 조회수를 확실히 앞세운다.
+		for (int i = 0; i < 5; i++) {
+			mockMvc.perform(get("/api/v1/exhibitions/{id}", picassoId)).andExpect(status().isOk());
+		}
+
+		mockMvc.perform(get("/api/v1/exhibitions").param("region", "SEOUL").param("sort", "popular"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.data.content[0].title").value(PICASSO));
 	}
 
 	@Test
-	@DisplayName("GET /exhibitions?region=SEOUL&sort=popular — 조회수순(상세를 여러 번 조회한 피카소전이 1위)")
-	void 목록_정렬_popular() throws Exception {
-		Long picassoId = exhibitionRepository.findByExternalId("CAT-PICASSO").orElseThrow().getId();
-		// 상세 GET은 매 호출마다 ourViewCount를 1씩 증가시킨다(Exhibition.increaseView) — 3회 조회해 다른 전시보다 조회수를 확실히 앞세운다.
-		for (int i = 0; i < 3; i++) {
-			mockMvc.perform(get("/api/v1/exhibitions/{id}", picassoId)).andExpect(status().isOk());
-		}
-
-		mockMvc.perform(get("/api/v1/exhibitions").param("region", "SEOUL").param("sort", "popular"))
+	@DisplayName("GET /exhibitions?region=SEOUL&sort=ending — 종료일 임박순(이미 종료된 피카소전이 1위)")
+	void 목록_정렬_ending() throws Exception {
+		mockMvc.perform(get("/api/v1/exhibitions").param("region", "SEOUL").param("sort", "ending"))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.data.content[0].title").value(PICASSO));
 	}
@@ -222,24 +379,43 @@ class ExhibitionIntegrationTest {
 	}
 
 	@Test
-	@DisplayName("GET /exhibitions/{id} — 존재하는 CATALOG, 비로그인 200 + 상세(artists/keywords 빈 배열)")
-	void 상세_카탈로그_공개() throws Exception {
+	@DisplayName("GET /exhibitions/{id} — 존재하는 CATALOG, 비로그인 200 + 신규 필드(free/bookmarked/recorded/artistSummary)")
+	void 상세_카탈로그_공개_신규필드() throws Exception {
 		Long id = exhibitionRepository.findByExternalId("CAT-MONET").orElseThrow().getId();
 		mockMvc.perform(get("/api/v1/exhibitions/{id}", id))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.data.exhibitionId").value(id))
 				.andExpect(jsonPath("$.data.type").value("CATALOG"))
 				.andExpect(jsonPath("$.data.title").value(MONET))
-				.andExpect(jsonPath("$.data.region").value("SEOUL"))
-				.andExpect(jsonPath("$.data.category").value("PAINTING"))
 				.andExpect(jsonPath("$.data.artists").isArray())
 				.andExpect(jsonPath("$.data.artists").isEmpty())
 				.andExpect(jsonPath("$.data.keywords").isArray())
-				.andExpect(jsonPath("$.data.keywords").isEmpty());
+				.andExpect(jsonPath("$.data.keywords").isEmpty())
+				// CATALOG의 artistSummary는 null, 비로그인이라 bookmarked·recorded false
+				.andExpect(jsonPath("$.data.artistSummary").doesNotExist())
+				.andExpect(jsonPath("$.data.free").isBoolean())
+				.andExpect(jsonPath("$.data.bookmarked").value(false))
+				.andExpect(jsonPath("$.data.recorded").value(false));
 	}
 
 	@Test
-	@DisplayName("GET /exhibitions/{id} — CATALOG 상세 진입 시 지연수집 필드(주소·이미지·문의·조회수·홈페이지) 노출, 내부 보존 필드는 비노출")
+	@DisplayName("GET /exhibitions/{id} — 로그인+관심 등록 시 bookmarked=true, 무료 전시는 free=true")
+	void 상세_관심등록_bookmarked_true() throws Exception {
+		String token = loginAndGetAccessToken(7200001L, "관심유저");
+		long userId = userIdOf(token);
+		Long freeId = saveCatalog("BM-FREE", "관심표본 무료전", LocalDate.now().minusDays(100),
+				LocalDate.now().plusDays(30), ExhibitionRegion.SEJONG, ExhibitionCategory.PAINTING, "무료", null, null);
+		exhibitionBookmarkRepository.add(userId, freeId);
+
+		mockMvc.perform(get("/api/v1/exhibitions/{id}", freeId).header("Authorization", "Bearer " + token))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.free").value(true))
+				.andExpect(jsonPath("$.data.bookmarked").value(true))
+				.andExpect(jsonPath("$.data.recorded").value(false));
+	}
+
+	@Test
+	@DisplayName("GET /exhibitions/{id} — CATALOG 상세 진입 시 지연수집 필드 노출, 내부 보존 필드는 비노출")
 	void 상세_지연수집_필드_노출() throws Exception {
 		Long id = exhibitionRepository.findByExternalId("CAT-MONET").orElseThrow().getId();
 		given(catalogClient.fetchDetail("CAT-MONET")).willReturn(Optional.of(
@@ -281,7 +457,7 @@ class ExhibitionIntegrationTest {
 	}
 
 	@Test
-	@DisplayName("POST /exhibitions/custom — 전시 형태·작가 포함 등록 → 상세에 format=SOLO·artists=[작가] 반영")
+	@DisplayName("POST /exhibitions/custom — 전시 형태·작가 포함 → 상세에 format=SOLO·artists=[작가]·artistSummary=작가 반영")
 	void 개인전시_등록_전시형태_작가() throws Exception {
 		String token = loginAndGetAccessToken(7000010L, "형태유저");
 		MvcResult created = mockMvc.perform(post("/api/v1/exhibitions/custom")
@@ -310,7 +486,8 @@ class ExhibitionIntegrationTest {
 				.andExpect(jsonPath("$.data.format").value("SOLO"))
 				.andExpect(jsonPath("$.data.place").value("아리랑 문화관"))
 				.andExpect(jsonPath("$.data.artists", hasSize(1)))
-				.andExpect(jsonPath("$.data.artists[0]").value("김선영"));
+				.andExpect(jsonPath("$.data.artists[0]").value("김선영"))
+				.andExpect(jsonPath("$.data.artistSummary").value("김선영"));
 	}
 
 	@Test

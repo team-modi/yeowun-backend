@@ -55,12 +55,22 @@ public class User extends BaseEntity {
 	@Column(name = "birth_year")
 	private Integer birthYear;
 
+	/** 리마인드 알림 수신 여부. 가입 시 기본 true(옵트아웃 방식). */
+	@Column(name = "remind_enabled", nullable = false)
+	private boolean remindEnabled;
+
+	/** 공지 알림 수신 여부. 가입 시 기본 true(옵트아웃 방식). */
+	@Column(name = "notice_enabled", nullable = false)
+	private boolean noticeEnabled;
+
 	private User(String nickname, String name, AgeGroup ageGroup, Integer birthYear) {
 		this.nickname = nickname;
 		this.name = name;
 		this.profileCompleted = false;
 		this.ageGroup = ageGroup == null ? AgeGroup.UNSPECIFIED : ageGroup;
 		this.birthYear = birthYear;
+		this.remindEnabled = true;
+		this.noticeEnabled = true;
 	}
 
 	/** 소셜 가입 시(연령대·출생연도 미제공): nickname만 채우고 연령대 UNSPECIFIED로 생성. */
@@ -118,6 +128,12 @@ public class User extends BaseEntity {
 			throw new CoreException(UserErrorCode.INVALID_NICKNAME, "닉네임 규칙 위반: " + nickname);
 		}
 		this.nickname = nickname;
+	}
+
+	/** 알림 설정 갱신 — 리마인드·공지 수신 여부를 모두 반영한다(전체 갱신). */
+	public void updateNotificationSettings(boolean remindEnabled, boolean noticeEnabled) {
+		this.remindEnabled = remindEnabled;
+		this.noticeEnabled = noticeEnabled;
 	}
 
 	/** 거주지역 불변식: 구/군만 있고 시/도가 없는 조합은 불가 → {@link ErrorType#INVALID_INPUT}. */
