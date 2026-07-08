@@ -1,0 +1,128 @@
+name: publish-openapi
+
+# 배치: modi-backend/.github/workflows/publish-openapi.yml
+#
+# 하는 일: develop 머지 시 앱을 부팅해 /v3/api-docs를 덤프·정규화·커밋하고,
+# 변경이 있으면 modi-frontend로 repository_dispatch(openapi-updated)를 쏜다.
+# 이 이벤트가 프론트의 API 자동 동기화(api-sync.yml)를 깨우는 벨이다.
+#
+# springdoc 3.0.3이 이미 build.gradle에 있으므로 애플리케이션/빌드 수정은 없다.
+#
+# 필요한 시크릿: FE_REPO_PAT — modi-frontend에 contents:write + dispatch 가능한 PAT.
+# (앱 부팅에 필요한 JWT/OAuth 시크릿은 application.yaml에 로컬 기본값이 있어 CI 부팅엔 불필요.
+#  운영 값이 아니라 스펙 덤프 목적이므로 기본값으로 충분하다.)
+
+on:
+  push:
+    branches: [develop]        # develop 머지 트리거. (운영 스펙도 발행하려면 main 추가)
+    paths:
+      - 'src/main/**'
+      - 'build.gradle*'
+  workflow_dispatch: {}         # Actions 탭에서 수동 실행(테스트/최초 발행용)
+
+jobs:
+  generate-and-dispatch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # 기본 토큰(GITHUB_TOKEN)에 쓰기 권한을 줌 -> openapi-spec 브랜치에 커밋/푸시하려면 필요.(이건 같은 레포용 권한이고, 프론트로 쏘는 건 별도)
+
+
+    services:
+      mysql: # job동안만 살아있는 일회성 MySQL, 데이터가 필요해서 띄우는게 아니라, JPA/DataSource 초기화 때문에 DB가 없으면 앱이 안 떠서 부팅 조건만 채워주는 용도
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: modi
+          MYSQL_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval=5s 
+          --health-timeout=3s
+          --health-retries=20
+
+    steps:
+      - uses: actions/checkout@v4 # 레포 소스를 러너로 체크아웃
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - name: Boot app & dump OpenAPI spec # 여기가 스펙을 실제로 뽑는 핵심
+        env:
+          SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:3306/modi
+          SPRING_DATASOURCE_USERNAME: root
+          SPRING_DATASOURCE_PASSWORD: root
+          # spring-boot-docker-compose가 developmentOnly로 클래스패스에 있으므로,
+          # CI에선 compose 기동 시도를 끈다(스펙 덤프에 불필요).
+          SPRING_DOCKER_COMPOSE_ENABLED: 'false'
+          # JWT/OAuth 시크릿을 application.yaml 기본값 대신 레포 시크릿에서 주입한다.
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          KAKAO_CLIENT_SECRET: ${{ secrets.KAKAO_CLIENT_SECRET }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+        run: |
+          chmod +x gradlew
+          ./gradlew bootRun --no-daemon &
+          BOOT_PID=$!
+          ok=false
+          for i in $(seq 1 90); do
+            if curl -sf http://localhost:8080/v3/api-docs -o /tmp/openapi.json; then
+              ok=true; break
+            fi
+            # 앱 프로세스가 죽었으면 더 기다리지 말고 즉시 중단
+            kill -0 "$BOOT_PID" 2>/dev/null || break
+            sleep 2
+          done
+          kill "$BOOT_PID" 2>/dev/null || true
+          if [ "$ok" != "true" ]; then
+            echo "::error::/v3/api-docs 덤프 실패 (앱 부팅 또는 스펙 노출 확인)"
+            exit 1
+          fi
+          # 커밋 diff 안정화를 위해 키 정렬로 정규화
+          python3 -m json.tool --sort-keys /tmp/openapi.json > /tmp/openapi.pretty.json
+
+      - name: Publish spec to openapi-spec branch if changed # 스펙 달라졌을때만 발행됨
+        id: commit
+        run: |
+          mkdir -p openapi
+          cp /tmp/openapi.pretty.json openapi/openapi.json
+          # develop은 PR 필수(보호 브랜치)라 워크플로가 직접 push 불가(GH006).
+          # 그래서 스펙은 사람이 안 만지는 전용 비보호 브랜치 openapi-spec로 발행한다.
+          # 직전 발행본과 비교해 실제 변경이 있을 때만 발행+dispatch.
+          git fetch origin openapi-spec --depth=1 2>/dev/null || true
+          if git cat-file -e origin/openapi-spec:openapi/openapi.json 2>/dev/null; then
+            git show origin/openapi-spec:openapi/openapi.json > /tmp/prev.json
+            if diff -q /tmp/prev.json openapi/openapi.json >/dev/null; then
+              echo "changed=false" >> "$GITHUB_OUTPUT"
+              echo "스펙 변경 없음 - dispatch 생략"
+              exit 0
+            fi
+          fi
+          git config user.name  "yeowun-api-sync-bot"
+          git config user.email "yeowun-api-sync-bot@users.noreply.github.com"
+          git checkout -B openapi-spec
+          git add openapi/openapi.json
+          git commit -m "chore: publish openapi spec [skip ci]"
+          git push -f origin openapi-spec
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch to modi-frontend # 앞 스텝이 바뀌었을때, 프론트로 디스패치
+        if: steps.commit.outputs.changed == 'true'
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.FE_REPO_PAT }} #  크로스 레포용 PAT가 필수.
+          repository: team-modi/modi-frontend # 대상 레포
+          event-type: openapi-updated # 프론트의 api-sync.yml이 귀 기울이는 커스텀 이벤트 이름
+          # client-payload: 함께 보내는 데이터
+          # backend_sha:  이 스펙을 만든 백엔드 커밋
+          # source_branch: 어느 브랜치 머지가 유발했는지전달
+          # spect_url: 파일 자체가 아니라 raw URL을 넘김. payload는 크기 제한이 작아 91KB 스펙이 안 들어가고, 프론트는 늘 정해진 openapi-spec 브랜치에서 당겨오면 되기 때문.
+          client-payload: >-
+            {
+              "backend_sha": "${{ github.sha }}",
+              "source_branch": "${{ github.ref_name }}",
+              "backend_author": "${{ github.event.head_commit.author.name }}",
+              "spec_url": "https://raw.githubusercontent.com/team-modi/modi-backend/openapi-spec/openapi/openapi.json"
+            }
