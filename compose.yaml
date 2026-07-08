@@ -51,8 +51,9 @@ services:
       #   (여기서 `CULTURE_API_KEY=${CULTURE_API_KEY:-}`로 빈값을 넘기면 Spring이 "변수 존재=빈값"으로 보고 yaml 기본값을 덮어써 버림.)
       #   env로 바꾸고 싶으면 이 줄을 살리되 반드시 실제 값이 채워질 때만 넘길 것.
     ports:
-      # 호스트 8080은 다른 로컬 컨테이너가 쓰는 경우가 많아 18090으로 노출한다(README·Postman baseUrl과 일치).
-      - '18090:8080'
+      # 호스트 노출 포트는 env로 바꾼다. 로컬은 기본 18090(8080은 다른 로컬 컨테이너와 충돌 잦음, README·Postman과 일치),
+      # 운영(EC2 배포)은 deploy.yml의 .env가 APP_HOST_PORT=8080을 주입해 공개 주소·헬스체크(localhost:8080)와 맞춘다.
+      - '${APP_HOST_PORT:-18090}:8080'
 
 volumes:
   mysql-data:
