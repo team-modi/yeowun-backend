@@ -1,18 +1,20 @@
 package modi.backend.application.exhibition;
 
+import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.temporal.TemporalAdjusters;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import lombok.RequiredArgsConstructor;
+import modi.backend.domain.bookmark.ExhibitionBookmarkRepository;
 import modi.backend.domain.exhibition.CatalogExhibitionData;
 import modi.backend.domain.exhibition.Exhibition;
 import modi.backend.domain.exhibition.ExhibitionCatalogClient;
@@ -22,48 +24,81 @@ import modi.backend.domain.exhibition.ExhibitionFormat;
 import modi.backend.domain.exhibition.ExhibitionQuery;
 import modi.backend.domain.exhibition.ExhibitionRegion;
 import modi.backend.domain.exhibition.ExhibitionRepository;
+import modi.backend.domain.exhibition.ExhibitionSection;
 import modi.backend.domain.exhibition.GenreClassification;
 import modi.backend.domain.exhibition.GenreClassifier;
+import modi.backend.domain.venue.Venue;
+import modi.backend.domain.venue.VenueErrorCode;
+import modi.backend.domain.venue.VenueRepository;
+import modi.backend.infra.record.RecordJpaRepository;
 import modi.backend.support.error.CoreException;
 import modi.backend.support.error.ErrorType;
+import modi.backend.support.response.Cursor;
 import modi.backend.support.time.AppTime;
 
 /**
  * 전시 유스케이스 조율(03_전시.md). load·조율·save만 하고, 상태 변경·규칙 판단은 {@link Exhibition} 메서드에 위임한다.
- * CATALOG는 외부 API({@link ExhibitionCatalogClient})로 동기화해 DB에 upsert하고, 조회/등록은 DB만 본다
- * (실시간 외부 호출 대신 수집-적재 방식 — 공공데이터 리뷰의 "야간 배치 동기화" 아키텍처).
+ * 목록은 커서(키셋) 페이지네이션 — latest/ending/popular은 DB 키셋, distance는 앱 레이어 정렬(best-effort).
+ * CATALOG는 외부 API로 동기화해 DB에 upsert하고 조회/등록은 DB만 본다(수집-적재 방식).
  */
 @Service
 @RequiredArgsConstructor
 public class ExhibitionFacade {
 
 	private static final Logger log = LoggerFactory.getLogger(ExhibitionFacade.class);
+	private static final int DEFAULT_SIZE = 20;
+	private static final int MAX_SIZE = 50;
+	private static final int ENDING_SOON_DAYS = 7;
+	private static final int BANNER_LIMIT = 3;
 
 	private final ExhibitionRepository exhibitionRepository;
 	private final ExhibitionCatalogClient catalogClient;
+	private final ExhibitionBookmarkRepository exhibitionBookmarkRepository;
+	private final VenueRepository venueRepository;
+	// 크로스 도메인 실용 조회: 상세의 recorded 계산을 위해 record의 Spring Data 리포지토리를 직접 읽는다(전용 포트 미도입).
+	private final RecordJpaRepository recordJpaRepository;
 	/** 장르 분류 전략(랜덤/AI) — 주입되는 구현은 {@code app.exhibition.genre.classifier}로 선택된다(@Primary). */
 	private final GenreClassifier genreClassifier;
 
 	/**
-	 * 목록/탐색(3.3.1). 필터 미지정 시 오늘 진행 중인 전시를 기본 노출한다. 비로그인은 CATALOG만.
-	 * 정렬(latest|ending|popular)은 DB 쿼리에서 처리한다 — 요청 Pageable의 sort를 매핑한 Sort로 재구성해 전달한다.
+	 * 목록/탐색(5.2). 필터 미지정 시 오늘 진행 중인 전시를 기본 노출한다. 비로그인은 CATALOG만.
+	 * 커서의 정렬 판별자는 현재 sort와 일치해야 한다(Cursor.decode가 검증 → INVALID_CURSOR).
 	 */
 	@Transactional(readOnly = true)
-	public Page<ExhibitionResult.ListItem> search(ExhibitionCriteria.Search criteria, Pageable pageable) {
-		ExhibitionRegion region = criteria.region() == null ? null : ExhibitionRegion.from(criteria.region());
-		ExhibitionCategory category = criteria.category() == null ? null
-				: ExhibitionCategory.from(criteria.category());
-		LocalDate ongoingOn = resolveOngoingOn(criteria.date(), criteria.keyword(), region, category);
+	public ExhibitionResult.ListPage search(ExhibitionCriteria.Search criteria) {
+		LocalDate today = LocalDate.now(AppTime.KST);
+		String keyword = normalizeKeyword(criteria.keyword());
+		List<ExhibitionRegion> regions = parseRegions(criteria.region());
+		List<ExhibitionCategory> categories = parseCategories(criteria.category());
+		ExhibitionSection section = ExhibitionSection.from(criteria.section());
+		String sort = canonicalSort(criteria.sort());
+		int size = clampSize(criteria.size());
+		LocalDate ongoingOn = resolveOngoingOn(criteria.date(), keyword, regions, categories, section, today);
 
-		ExhibitionQuery query = new ExhibitionQuery(criteria.keyword(), ongoingOn, region, category,
-				criteria.requesterId());
-		Pageable sortedPageable = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(),
-				toSort(criteria.sort()));
-		return exhibitionRepository.search(query, sortedPageable).map(ExhibitionResult.ListItem::from);
+		if ("distance".equals(sort)) {
+			return searchByDistance(criteria, today, size,
+					buildQuery(keyword, ongoingOn, regions, categories, section, today, criteria.period(),
+							"distance", null, null, criteria.requesterId()));
+		}
+
+		Cursor cursor = Cursor.decode(criteria.cursor(), sort).orElse(null);
+		String cursorKey = cursor == null ? null : cursor.key();
+		Long cursorId = cursor == null ? null : cursor.lastId();
+		ExhibitionQuery query = buildQuery(keyword, ongoingOn, regions, categories, section, today,
+				criteria.period(), sort, cursorKey, cursorId, criteria.requesterId());
+
+		List<Exhibition> rows = exhibitionRepository.searchSlice(query, size + 1);
+		boolean hasNext = rows.size() > size;
+		List<Exhibition> page = hasNext ? rows.subList(0, size) : rows;
+
+		Set<Long> bookmarked = bookmarkedIds(criteria.requesterId(), page);
+		List<ExhibitionResult.ListItem> content = page.stream()
+				.map(e -> ExhibitionResult.ListItem.from(e, today, bookmarked.contains(e.getId())))
+				.toList();
+		String nextCursor = hasNext ? encodeCursor(sort, page.get(page.size() - 1)) : null;
+		long totalCount = exhibitionRepository.count(query);
+		return new ExhibitionResult.ListPage(content, nextCursor, hasNext, totalCount);
 	}
-
-	/** 홈 배너 최대 노출 개수(03_전시.md E-10). */
-	private static final int BANNER_LIMIT = 3;
 
 	/**
 	 * 홈 배너(03_전시.md E-10). 운영자 지정 기능은 아직 없어, 오늘 진행 중인 전시 중 조회수 상위 최대 3개를 노출한다.
@@ -75,19 +110,42 @@ public class ExhibitionFacade {
 				.stream().map(ExhibitionResult.Banner::from).toList();
 	}
 
-	/** sort 코드 → DB 정렬. latest(기본)=시작일 최신순, ending=종료일 임박순, popular=조회수 많은순. 미정의 값은 latest로 취급. */
-	private Sort toSort(String sort) {
-		return switch (sort == null ? "latest" : sort) {
-			case "ending" -> Sort.by(Sort.Direction.ASC, "endDate");
-			case "popular" -> Sort.by(Sort.Direction.DESC, "ourViewCount");
-			default -> Sort.by(Sort.Direction.DESC, "startDate");
-		};
+	/**
+	 * 거리순(5.2, P2 best-effort). lat·lng 필수. 후보를 앱 레이어에서 단순 제곱거리로 정렬(좌표 null은 뒤로)하고,
+	 * 커서는 마지막 id 위치 기준으로 슬라이스한다(완전한 키셋 대신 후보 재조회 — 단순화).
+	 */
+	private ExhibitionResult.ListPage searchByDistance(ExhibitionCriteria.Search criteria, LocalDate today,
+			int size, ExhibitionQuery query) {
+		if (criteria.lat() == null || criteria.lng() == null) {
+			throw new CoreException(ErrorType.INVALID_INPUT, "거리순 정렬은 lat·lng가 필요합니다.");
+		}
+		double lat = criteria.lat();
+		double lng = criteria.lng();
+		List<Exhibition> ordered = exhibitionRepository.searchAll(query).stream()
+				.sorted(distanceComparator(lat, lng))
+				.toList();
+
+		Cursor cursor = Cursor.decode(criteria.cursor(), "distance").orElse(null);
+		int start = cursor == null ? 0 : nextIndexAfter(ordered, cursor.lastId());
+		int end = Math.min(start + size, ordered.size());
+		List<Exhibition> page = start >= ordered.size() ? List.of() : ordered.subList(start, end);
+		boolean hasNext = end < ordered.size();
+
+		Set<Long> bookmarked = bookmarkedIds(criteria.requesterId(), page);
+		List<ExhibitionResult.ListItem> content = page.stream()
+				.map(e -> ExhibitionResult.ListItem.from(e, today, bookmarked.contains(e.getId())))
+				.toList();
+		String nextCursor = null;
+		if (hasNext) {
+			Exhibition last = page.get(page.size() - 1);
+			nextCursor = Cursor.of("distance", String.valueOf(distanceSq(last, lat, lng)), last.getId()).encode();
+		}
+		return new ExhibitionResult.ListPage(content, nextCursor, hasNext, ordered.size());
 	}
 
 	/**
-	 * 상세(3.3.2). 없으면 404, 타인의 CUSTOM이면 403.
-	 * CATALOG이고 아직 상세(detail2)를 수집하지 않았으면 최초 진입 시 1회 지연 수집해 캐시한다.
-	 * 외부 수집 실패는 요청을 막지 않는다 — 기본 필드만으로 응답하고, detailSyncedAt이 null로 남아 다음 조회 때 재시도한다.
+	 * 상세(5.3). 없으면 404, 타인의 CUSTOM이면 403. CATALOG 최초 진입 시 상세를 1회 지연 수집해 캐시한다.
+	 * bookmarked·recorded는 요청자 기준으로 채운다(비로그인 false).
 	 */
 	@Transactional
 	public ExhibitionResult.Detail getDetail(ExhibitionCriteria.Detail criteria) {
@@ -105,10 +163,15 @@ public class ExhibitionFacade {
 		}
 		exhibition.increaseView();
 		exhibitionRepository.save(exhibition);
-		return ExhibitionResult.Detail.from(exhibition);
+		Long requesterId = criteria.requesterId();
+		boolean bookmarked = requesterId != null
+				&& exhibitionBookmarkRepository.existsActive(requesterId, exhibition.getId());
+		boolean recorded = requesterId != null
+				&& recordJpaRepository.existsByUserIdAndExhibitionIdAndDeletedAtIsNull(requesterId, exhibition.getId());
+		return ExhibitionResult.Detail.from(exhibition, bookmarked, recorded);
 	}
 
-	/** 스냅샷/조회용 — 조회수 증가·외부 상세수집 없이 DB에서만 전시를 읽어 반환한다(기록 생성 등 내부 사용). */
+	/** 스냅샷/조회용 — 조회수 증가·외부 상세수집·개인화 없이 DB에서만 전시를 읽어 반환한다(기록 생성 등 내부 사용). */
 	@Transactional(readOnly = true)
 	public ExhibitionResult.Detail getForSnapshot(Long exhibitionId, Long requesterId) {
 		Exhibition e = exhibitionRepository.findById(exhibitionId)
@@ -116,20 +179,32 @@ public class ExhibitionFacade {
 		if (!e.isAccessibleBy(requesterId)) {
 			throw new CoreException(ErrorType.FORBIDDEN, "타인의 개인 전시 접근: " + exhibitionId);
 		}
-		return ExhibitionResult.Detail.from(e);
+		return ExhibitionResult.Detail.from(e, false, false);
 	}
 
-	/** 개인 전시 등록(3.3.3). 제목 필수·기간 검증은 Entity에서 수행한다. */
+	/**
+	 * 개인 전시 등록(5.4). 제목 필수·기간·개인전 작가 검증은 Entity에서 수행한다.
+	 * venueId가 있으면 전시관에서 장소·지역(요청 region 미지정 시)을 파생한다(없는 venueId면 404). 장르 키워드는 마스터에서 무작위로 1개 부여(임시).
+	 */
 	@Transactional
 	public ExhibitionResult.Created registerCustom(ExhibitionCriteria.CustomCreate criteria) {
 		ExhibitionRegion region = criteria.region() == null ? null : ExhibitionRegion.from(criteria.region());
 		ExhibitionCategory category = criteria.category() == null ? null
 				: ExhibitionCategory.from(criteria.category());
 		ExhibitionFormat format = criteria.format() == null ? null : ExhibitionFormat.from(criteria.format());
+		String place = criteria.place();
+		if (criteria.venueId() != null) {
+			Venue venue = venueRepository.findById(criteria.venueId())
+					.orElseThrow(() -> new CoreException(VenueErrorCode.VENUE_NOT_FOUND));
+			place = venue.getName();
+			if (region == null) {
+				region = venue.getRegion();
+			}
+		}
 		// 장르는 분류기(랜덤/AI)가 부여한다. 분류기는 실패해도 예외를 던지지 않고 유효 장르를 반환하므로 등록 흐름을 깨지 않는다.
 		String genreKeyword = genreClassifier.classify(new GenreClassification(criteria.title(),
-				category == null ? null : category.name(), null, criteria.place(), criteria.artist(), null));
-		Exhibition exhibition = Exhibition.createCustom(criteria.ownerId(), criteria.title(), criteria.place(),
+				category == null ? null : category.name(), null, place, criteria.artist(), null));
+		Exhibition exhibition = Exhibition.createCustom(criteria.ownerId(), criteria.title(), place,
 				criteria.startDate(), criteria.endDate(), region, category, format, criteria.artist(),
 				criteria.posterUrl(), genreKeyword);
 		return ExhibitionResult.Created.from(exhibitionRepository.save(exhibition));
@@ -206,14 +281,129 @@ public class ExhibitionFacade {
 				data.realmName(), data.areaText()));
 	}
 
-	/** date 지정 시 그 날짜, 아무 필터 없으면 오늘(랜딩 기본), 그 외(keyword/region/category만)엔 기간 제한 없음. */
-	private LocalDate resolveOngoingOn(LocalDate date, String keyword, ExhibitionRegion region,
-			ExhibitionCategory category) {
+	/** date 지정 시 그 날짜, 아무 필터(키워드·지역·카테고리·섹션) 없으면 오늘(랜딩 기본), 그 외엔 기간 제한 없음. */
+	private LocalDate resolveOngoingOn(LocalDate date, String keyword, List<ExhibitionRegion> regions,
+			List<ExhibitionCategory> categories, ExhibitionSection section, LocalDate today) {
 		if (date != null) {
 			return date;
 		}
-		boolean noOtherFilter = (keyword == null || keyword.isBlank()) && region == null && category == null;
-		// 랜딩 기본 "진행중"은 한국 기준 오늘(JVM 기본 타임존은 UTC).
-		return noOtherFilter ? LocalDate.now(AppTime.KST) : null;
+		boolean noOtherFilter = (keyword == null || keyword.isBlank()) && regions.isEmpty()
+				&& categories.isEmpty() && section == null;
+		return noOtherFilter ? today : null;
+	}
+
+	/** 섹션 날짜창을 오늘·period로 계산해 조회 쿼리를 만든다. */
+	private ExhibitionQuery buildQuery(String keyword, LocalDate ongoingOn, List<ExhibitionRegion> regions,
+			List<ExhibitionCategory> categories, ExhibitionSection section, LocalDate today, String period,
+			String sort, String cursorKey, Long cursorId, Long requesterId) {
+		LocalDate from = null;
+		LocalDate to = null;
+		if (section == ExhibitionSection.ENDING_SOON) {
+			from = today;
+			to = today.plusDays(ENDING_SOON_DAYS);
+		} else if (section == ExhibitionSection.OPENING_THIS_MONTH) {
+			if ("week".equalsIgnoreCase(period == null ? "" : period.trim())) {
+				from = today.with(DayOfWeek.MONDAY);
+				to = today.with(DayOfWeek.SUNDAY);
+			} else {
+				from = today.withDayOfMonth(1);
+				to = today.with(TemporalAdjusters.lastDayOfMonth());
+			}
+		}
+		return new ExhibitionQuery(keyword, ongoingOn, regions, categories, section, from, to, sort,
+				cursorKey, cursorId, requesterId);
+	}
+
+	private Set<Long> bookmarkedIds(Long requesterId, List<Exhibition> page) {
+		if (requesterId == null || page.isEmpty()) {
+			return Set.of();
+		}
+		List<Long> ids = page.stream().map(Exhibition::getId).toList();
+		return exhibitionBookmarkRepository.findBookmarkedExhibitionIds(requesterId, ids);
+	}
+
+	/** 마지막 커서 값(정렬 컬럼값 + id)으로 다음 페이지 커서를 인코딩한다. 정렬 컬럼값이 null이면 key 없이 id만. */
+	private static String encodeCursor(String sort, Exhibition last) {
+		String key = switch (sort) {
+			case "ending" -> last.getEndDate() == null ? null : last.getEndDate().toString();
+			case "popular" -> String.valueOf(last.getOurViewCount());
+			default -> last.getStartDate() == null ? null : last.getStartDate().toString();
+		};
+		return Cursor.of(sort, key, last.getId()).encode();
+	}
+
+	private static Comparator<Exhibition> distanceComparator(double lat, double lng) {
+		return Comparator.comparingDouble((Exhibition e) -> distanceSq(e, lat, lng))
+				.thenComparing(Exhibition::getId);
+	}
+
+	/** 단순 제곱 유클리드 거리(좌표 null은 최댓값 → 뒤로). 근거리 정렬 근사로 충분하다(정밀 하버사인 대신 단순화). */
+	private static double distanceSq(Exhibition e, double lat, double lng) {
+		if (e.getGpsX() == null || e.getGpsY() == null) {
+			return Double.MAX_VALUE;
+		}
+		double dx = e.getGpsX() - lng;
+		double dy = e.getGpsY() - lat;
+		return dx * dx + dy * dy;
+	}
+
+	/** 정렬된 리스트에서 lastId 항목 다음 인덱스. 못 찾으면(데이터 변동) 0(처음부터). */
+	private static int nextIndexAfter(List<Exhibition> ordered, Long lastId) {
+		for (int i = 0; i < ordered.size(); i++) {
+			if (ordered.get(i).getId().equals(lastId)) {
+				return i + 1;
+			}
+		}
+		return 0;
+	}
+
+	private static String normalizeKeyword(String raw) {
+		if (raw == null) {
+			return null;
+		}
+		String trimmed = raw.trim();
+		if (trimmed.isEmpty()) {
+			return null;
+		}
+		if (trimmed.length() < 2) {
+			throw new CoreException(ErrorType.INVALID_INPUT, "검색어는 최소 2글자여야 합니다: " + raw);
+		}
+		return trimmed;
+	}
+
+	private static List<ExhibitionRegion> parseRegions(String raw) {
+		if (raw == null || raw.isBlank()) {
+			return List.of();
+		}
+		return Arrays.stream(raw.split(",")).map(String::trim).filter(s -> !s.isEmpty())
+				.map(ExhibitionRegion::from).toList();
+	}
+
+	private static List<ExhibitionCategory> parseCategories(String raw) {
+		if (raw == null || raw.isBlank()) {
+			return List.of();
+		}
+		return Arrays.stream(raw.split(",")).map(String::trim).filter(s -> !s.isEmpty())
+				.map(ExhibitionCategory::from).toList();
+	}
+
+	/** sort 코드 → 정규화(latest 기본). 미정의 값은 latest로 취급한다(커서 정렬 판별자도 이 값으로 통일). */
+	private static String canonicalSort(String sort) {
+		if (sort == null) {
+			return "latest";
+		}
+		return switch (sort.trim().toLowerCase()) {
+			case "ending" -> "ending";
+			case "popular" -> "popular";
+			case "distance" -> "distance";
+			default -> "latest";
+		};
+	}
+
+	private static int clampSize(Integer size) {
+		if (size == null || size < 1) {
+			return DEFAULT_SIZE;
+		}
+		return Math.min(size, MAX_SIZE);
 	}
 }

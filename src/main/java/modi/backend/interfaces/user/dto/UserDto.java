@@ -2,6 +2,7 @@ package modi.backend.interfaces.user.dto;
 
 import java.util.List;
 
+import jakarta.validation.constraints.NotNull;
 import modi.backend.application.user.UserResult;
 
 /**
@@ -47,6 +48,21 @@ public final class UserDto {
 					result.profileImageUrl(), result.ageGroup(), result.birthYear(), result.residenceRegion(),
 					result.residenceDistrict(), result.tasteKeywords(),
 					new Stats(s.recordCount(), s.exhibitionCount(), s.bookmarkCount()));
+		}
+	}
+
+	/**
+	 * 알림 설정 수정 요청(4.4) — 두 필드 모두 필수. 누락 시 Bean Validation이 INVALID_INPUT(400)으로 매핑한다.
+	 * (원시 boolean은 미포함을 false로 흡수하므로 필수 검증을 위해 Boolean 사용.)
+	 */
+	public record NotificationSettingsRequest(@NotNull Boolean remindEnabled, @NotNull Boolean noticeEnabled) {
+	}
+
+	/** 알림 설정 조회·수정 응답(4.3·4.4). */
+	public record NotificationSettingsResponse(boolean remindEnabled, boolean noticeEnabled) {
+
+		public static NotificationSettingsResponse from(UserResult.NotificationSettings result) {
+			return new NotificationSettingsResponse(result.remindEnabled(), result.noticeEnabled());
 		}
 	}
 }

@@ -3,6 +3,7 @@ package modi.backend.interfaces;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -26,6 +27,7 @@ import com.jayway.jsonpath.JsonPath;
 
 import modi.backend.TestcontainersConfiguration;
 import modi.backend.domain.auth.TokenProvider;
+import modi.backend.domain.bookmark.ExhibitionBookmarkRepository;
 import modi.backend.domain.user.User;
 import modi.backend.domain.user.UserRepository;
 import modi.backend.infra.auth.KakaoApi;
@@ -55,6 +57,9 @@ class UserProfileIntegrationTest {
 
 	@Autowired
 	UserJpaRepository userJpaRepository;
+
+	@Autowired
+	ExhibitionBookmarkRepository exhibitionBookmarkRepository;
 
 	@MockitoBean
 	KakaoApi kakaoApi;
@@ -258,6 +263,86 @@ class UserProfileIntegrationTest {
 		User user = userRepository.save(User.createFromSocial("삭제될유저"));
 		String accessToken = tokenProvider.issue(user, "kakao").accessToken();
 		userJpaRepository.deleteById(user.getId());
+
+		mockMvc.perform(get("/api/v1/users/me").header("Authorization", "Bearer " + accessToken))
+				.andExpect(status().isNotFound())
+				.andExpect(jsonPath("$.meta.errorCode").value("USER_NOT_FOUND"));
+	}
+
+	@Test
+	@DisplayName("GET /users/me/notification-settings — 신규 유저 기본값(리마인드·공지 모두 true)")
+	void 알림설정_조회_기본값() throws Exception {
+		String accessToken = loginAndGetAccessToken(7777701L, "알림유저");
+
+		mockMvc.perform(get("/api/v1/users/me/notification-settings")
+						.header("Authorization", "Bearer " + accessToken))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.meta.result").value("SUCCESS"))
+				.andExpect(jsonPath("$.data.remindEnabled").value(true))
+				.andExpect(jsonPath("$.data.noticeEnabled").value(true));
+	}
+
+	@Test
+	@DisplayName("PUT /users/me/notification-settings — {true,false} 200 에코, GET 재조회 반영")
+	void 알림설정_수정() throws Exception {
+		String accessToken = loginAndGetAccessToken(7777702L, "알림수정유저");
+
+		mockMvc.perform(put("/api/v1/users/me/notification-settings")
+						.header("Authorization", "Bearer " + accessToken)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("{\"remindEnabled\":true,\"noticeEnabled\":false}"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.remindEnabled").value(true))
+				.andExpect(jsonPath("$.data.noticeEnabled").value(false));
+
+		mockMvc.perform(get("/api/v1/users/me/notification-settings")
+						.header("Authorization", "Bearer " + accessToken))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.remindEnabled").value(true))
+				.andExpect(jsonPath("$.data.noticeEnabled").value(false));
+	}
+
+	@Test
+	@DisplayName("PUT /users/me/notification-settings — 필드 누락 → 400 INVALID_INPUT")
+	void 알림설정_필드누락_400() throws Exception {
+		String accessToken = loginAndGetAccessToken(7777703L, "알림누락유저");
+
+		mockMvc.perform(put("/api/v1/users/me/notification-settings")
+						.header("Authorization", "Bearer " + accessToken)
+						.contentType(MediaType.APPLICATION_JSON)
+						.content("{\"remindEnabled\":true}"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.meta.result").value("FAIL"))
+				.andExpect(jsonPath("$.meta.errorCode").value("INVALID_INPUT"));
+	}
+
+	@Test
+	@DisplayName("GET /users/me — stats.bookmarkCount는 전시 북마크 실집계")
+	void 프로필_북마크수_집계() throws Exception {
+		String accessToken = loginAndGetAccessToken(7777704L, "북마크유저");
+
+		// 로그인 유저의 id를 프로필 조회로 확보 후 북마크 등록
+		MvcResult me = mockMvc.perform(get("/api/v1/users/me").header("Authorization", "Bearer " + accessToken))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.stats.bookmarkCount").value(0))
+				.andReturn();
+		long userId = ((Number) JsonPath.read(me.getResponse().getContentAsString(), "$.data.userId")).longValue();
+		exhibitionBookmarkRepository.add(userId, 424242L);
+
+		mockMvc.perform(get("/api/v1/users/me").header("Authorization", "Bearer " + accessToken))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.stats.bookmarkCount").value(1));
+	}
+
+	@Test
+	@DisplayName("DELETE /users/me — 200 data null, 이후 같은 토큰 GET → 404 USER_NOT_FOUND")
+	void 회원탈퇴() throws Exception {
+		String accessToken = loginAndGetAccessToken(7777705L, "탈퇴유저");
+
+		mockMvc.perform(delete("/api/v1/users/me").header("Authorization", "Bearer " + accessToken))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.meta.result").value("SUCCESS"))
+				.andExpect(jsonPath("$.data").doesNotExist());
 
 		mockMvc.perform(get("/api/v1/users/me").header("Authorization", "Bearer " + accessToken))
 				.andExpect(status().isNotFound())

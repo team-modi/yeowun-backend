@@ -16,11 +16,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import modi.backend.domain.bookmark.ExhibitionBookmarkRepository;
 import modi.backend.domain.exhibition.CatalogDetailData;
 import modi.backend.domain.exhibition.Exhibition;
 import modi.backend.domain.exhibition.ExhibitionCatalogClient;
 import modi.backend.domain.exhibition.ExhibitionErrorCode;
 import modi.backend.domain.exhibition.ExhibitionRepository;
+import modi.backend.infra.record.RecordJpaRepository;
 import modi.backend.support.error.CoreException;
 import modi.backend.support.error.ErrorType;
 
@@ -32,14 +34,20 @@ class ExhibitionDetailTest {
 
 	private ExhibitionRepository exhibitionRepository;
 	private ExhibitionCatalogClient catalogClient;
+	private ExhibitionBookmarkRepository bookmarkRepository;
+	private modi.backend.domain.venue.VenueRepository venueRepository;
+	private RecordJpaRepository recordJpaRepository;
 	private ExhibitionFacade facade;
 
 	@BeforeEach
 	void setUp() {
 		exhibitionRepository = mock(ExhibitionRepository.class);
 		catalogClient = mock(ExhibitionCatalogClient.class);
-		facade = new ExhibitionFacade(exhibitionRepository, catalogClient,
-				new modi.backend.infra.genre.RandomGenreClassifier());
+		bookmarkRepository = mock(ExhibitionBookmarkRepository.class);
+		venueRepository = mock(modi.backend.domain.venue.VenueRepository.class);
+		recordJpaRepository = mock(RecordJpaRepository.class);
+		facade = new ExhibitionFacade(exhibitionRepository, catalogClient, bookmarkRepository, venueRepository,
+				recordJpaRepository, new modi.backend.infra.genre.RandomGenreClassifier());
 		given(exhibitionRepository.save(any(Exhibition.class))).willAnswer(invocation -> invocation.getArgument(0));
 	}
 

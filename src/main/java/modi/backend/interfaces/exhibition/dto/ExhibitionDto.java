@@ -25,8 +25,11 @@ public final class ExhibitionDto {
 			@NotBlank @Size(max = 100)
 			@Schema(description = "전시 제목. 필수, 공백 불가.", example = "친구와 다녀온 사진전")
 			String title,
+			@Schema(description = "전시관 ID(전시관 검색 선택). 지정 시 place·region은 전시관 값으로 파생하고, 없는 ID면 404 VENUE_NOT_FOUND. "
+					+ "venueId와 place는 둘 중 하나.", example = "7", nullable = true)
+			Long venueId,
 			@Size(max = 200)
-			@Schema(description = "전시 장소명. 선택.", example = "성수 갤러리", nullable = true)
+			@Schema(description = "전시 장소명(직접 입력). 선택. venueId가 있으면 무시된다.", example = "성수 갤러리", nullable = true)
 			String place,
 			@Schema(description = "시작일(YYYY-MM-DD 문자열). Controller에서 LocalDate로 파싱하며, "
 					+ "형식이 올바르지 않으면 400 INVALID_INPUT.", example = "2026-06-20", nullable = true)
@@ -40,8 +43,8 @@ public final class ExhibitionDto {
 							"CHUNGBUK", "ETC" }, nullable = true)
 			String region,
 			@Schema(description = "카테고리 코드(회화·사진 등 매체). 정의되지 않은 코드는 400 INVALID_INPUT.",
-					example = "PHOTO", allowableValues = { "PAINTING", "PHOTO", "MEDIA", "SCULPTURE", "ETC" },
-					nullable = true)
+					example = "PHOTO", allowableValues = { "PAINTING", "PHOTO", "MEDIA", "SCULPTURE", "DESIGN",
+							"CRAFT", "ARCHITECTURE", "PERFORMANCE", "ETC" }, nullable = true)
 			String category,
 			@Schema(description = "전시 형태. 정의되지 않은 코드는 400 INVALID_INPUT. SOLO=개인전, GROUP=단체전, "
 					+ "CURATED=기획전, ART_FAIR=아트페어.", example = "SOLO",
@@ -56,7 +59,7 @@ public final class ExhibitionDto {
 			String posterUrl) {
 	}
 
-	/** 목록 항목(3.3.1 content[]). */
+	/** 목록 항목(5.2 content[], 공통 스키마 ExhibitionListItem). */
 	public record ListItemResponse(
 			@Schema(description = "전시 ID", example = "51") Long exhibitionId,
 			@Schema(description = "전시 출처. CATALOG=외부 공개 전시 API 수집, CUSTOM=사용자 직접 등록",
@@ -68,11 +71,18 @@ public final class ExhibitionDto {
 			@Schema(description = "종료일", example = "2026-08-31") LocalDate endDate,
 			@Schema(description = "전시 장소명", example = "예술의전당 한가람미술관") String place,
 			@Schema(description = "지역 코드", example = "SEOUL") String region,
-			@Schema(description = "카테고리 코드", example = "PAINTING") String category) {
+			@Schema(description = "카테고리 코드", example = "PAINTING") String category,
+			@Schema(description = "작가 요약. CUSTOM은 등록 작가명, CATALOG는 null.", example = "김미경 외 10인",
+					nullable = true) String artistSummary,
+			@Schema(description = "종료 D-데이(오늘로부터 종료일까지 남은 일수). 종료일 없음/이미 종료면 null.", example = "5",
+					nullable = true) Integer dDay,
+			@Schema(description = "무료 여부", example = "true") boolean free,
+			@Schema(description = "요청자의 관심 등록 여부(비로그인 false)", example = "false") boolean bookmarked) {
 
 		public static ListItemResponse from(ExhibitionResult.ListItem result) {
 			return new ListItemResponse(result.exhibitionId(), result.type(), result.title(), result.posterUrl(),
-					result.startDate(), result.endDate(), result.place(), result.region(), result.category());
+					result.startDate(), result.endDate(), result.place(), result.region(), result.category(),
+					result.artistSummary(), result.dDay(), result.free(), result.bookmarked());
 		}
 	}
 
@@ -118,7 +128,13 @@ public final class ExhibitionDto {
 			@Schema(description = "상세 지연수집 필드 — 누적 조회수. 미수집 시 0.", example = "1024") long viewCount,
 			@Schema(description = "상세 지연수집 필드 — 시군구. 미수집 시 null.", example = "서초구", nullable = true) String sigungu,
 			@Schema(description = "상세 지연수집 필드 — 전시장 홈페이지 URL. 미수집 시 null.", example = "https://www.sac.or.kr",
-					nullable = true) String placeUrl) {
+					nullable = true) String placeUrl,
+			@Schema(description = "작가 요약. CUSTOM은 등록 작가명, CATALOG는 null.", example = "김미경 외 10인",
+					nullable = true) String artistSummary,
+			@Schema(description = "무료 여부", example = "true") boolean free,
+			@Schema(description = "요청자의 관심 등록 여부(비로그인 false)", example = "true") boolean bookmarked,
+			@Schema(description = "요청자가 이 전시에 대한 기록 보유 여부(비로그인 false). true면 '기록하기' 버튼 분기.",
+					example = "false") boolean recorded) {
 
 		public static DetailResponse from(ExhibitionResult.Detail result) {
 			return new DetailResponse(result.exhibitionId(), result.type(), result.title(), result.posterUrl(),
@@ -127,7 +143,8 @@ public final class ExhibitionDto {
 					result.description(), result.operatingHours(), result.price(), result.artists(),
 					result.keywords(), result.serviceName(), result.detailUrl(), result.gpsX(), result.gpsY(),
 					result.address(), result.imgUrl(), result.phone(), result.viewCount(), result.sigungu(),
-					result.placeUrl());
+					result.placeUrl(), result.artistSummary(), result.free(), result.bookmarked(),
+					result.recorded());
 		}
 	}
 

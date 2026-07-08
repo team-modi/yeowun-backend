@@ -13,7 +13,7 @@ import modi.backend.support.response.ApiResponse;
 /**
  * 사용자 API Swagger 스펙. (MVC 어노테이션은 {@link UserV1Controller})
  */
-@Tag(name = "User", description = "프로필 조회 · 수정")
+@Tag(name = "User", description = "프로필 조회 · 수정 · 알림 설정 · 탈퇴")
 public interface UserV1ApiSpec {
 
 	@Operation(summary = "내 프로필 조회", description = "프로필 + 취향 키워드 + 활동 통계. access 토큰 필요.")
@@ -25,4 +25,19 @@ public interface UserV1ApiSpec {
 	ResponseEntity<ApiResponse<UserDto.ProfileResponse>> updateProfile(
 			@Parameter(hidden = true) LoginUser user,
 			UserDto.ProfileRequest request);
+
+	@Operation(summary = "알림 설정 조회", description = "리마인드·공지 수신 여부. access 토큰 필요.")
+	@SecurityRequirement(name = "bearerAuth")
+	ResponseEntity<ApiResponse<UserDto.NotificationSettingsResponse>> notificationSettings(
+			@Parameter(hidden = true) LoginUser user);
+
+	@Operation(summary = "알림 설정 수정", description = "리마인드·공지 수신 여부 전체 갱신. 두 필드 모두 필수. access 토큰 필요.")
+	@SecurityRequirement(name = "bearerAuth")
+	ResponseEntity<ApiResponse<UserDto.NotificationSettingsResponse>> updateNotificationSettings(
+			@Parameter(hidden = true) LoginUser user,
+			UserDto.NotificationSettingsRequest request);
+
+	@Operation(summary = "회원 탈퇴", description = "soft-delete 후 토큰 무효화. 이후 프로필 조회는 404. access 토큰 필요.")
+	@SecurityRequirement(name = "bearerAuth")
+	ResponseEntity<ApiResponse<Object>> withdraw(@Parameter(hidden = true) LoginUser user);
 }
