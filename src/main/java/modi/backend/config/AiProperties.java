@@ -4,8 +4,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
  * AI(LLM) 설정. {@code app.ai.*} 바인딩. provider는 교체 가능하도록 문자열로 둔다(claude | gemini).
- * api-key는 시크릿 → 환경변수 주입(claude=ANTHROPIC_API_KEY, gemini=GEMINI_API_KEY, 공통=AI_API_KEY).
- * 미설정이면 어댑터가 비활성(AI_DISABLED)으로 동작.
+ * api-key는 시크릿 → 환경변수 주입. provider와 짝지어 지정한다(교차 오염 방지):
+ *   claude=ANTHROPIC_API_KEY, gemini=AI_API_KEY(=Gemini 키). 미설정이면 어댑터가 비활성(AI_DISABLED)으로 동작.
  * model 미지정 시 provider에 맞는 기본 모델을 쓴다(claude → claude-opus-4-8, gemini → gemini-2.5-flash).
  * timeoutSeconds: 외부 LLM 호출 타임아웃(워커 스레드 장기 점유 방지).
  * rateLimitSeconds: 사용자당 AI 호출 최소 간격(반복 클릭에 의한 유료 호출 폭주 방지).

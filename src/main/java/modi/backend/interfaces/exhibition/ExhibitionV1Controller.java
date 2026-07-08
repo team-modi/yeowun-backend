@@ -64,6 +64,14 @@ public class ExhibitionV1Controller implements ExhibitionV1ApiSpec {
 		return ResponseEntity.ok(ApiResponse.success(data));
 	}
 
+	/** 홈 배너(E-10). 오늘 진행 중인 전시 중 조회수 상위 최대 3개. 공개(인증 불필요). */
+	@Override
+	@GetMapping("/banners")
+	public ResponseEntity<ApiResponse<ExhibitionDto.BannersResponse>> banners() {
+		return ResponseEntity.ok(ApiResponse.success(
+				ExhibitionDto.BannersResponse.from(exhibitionFacade.banners())));
+	}
+
 	/** 상세. CATALOG 공개 / CUSTOM은 등록자 본인만(타인 접근 403). */
 	@Override
 	@GetMapping("/{exhibitionId}")
@@ -86,14 +94,6 @@ public class ExhibitionV1Controller implements ExhibitionV1ApiSpec {
 				parseDate(request.endDate()), request.region(), request.category(), request.format(),
 				request.artist(), request.posterUrl()));
 		return ResponseEntity.ok(ApiResponse.success(ExhibitionDto.CreatedResponse.from(result)));
-	}
-
-	/** 홈 배너(최대 3개). 인증 불필요(공개). 진행 중 CATALOG를 조회수 상위로 노출, 없으면 빈 배열. */
-	@Override
-	@GetMapping("/banners")
-	public ResponseEntity<ApiResponse<ExhibitionDto.BannersResponse>> banners() {
-		return ResponseEntity.ok(ApiResponse.success(
-				ExhibitionDto.BannersResponse.from(exhibitionFacade.banners())));
 	}
 
 	private static Long requesterId(Optional<LoginUser> loginUser) {

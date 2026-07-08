@@ -4,8 +4,9 @@ import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
- * 개인 전시(CUSTOM) 등록 시 부여하는 장르 키워드 마스터(임시). 지금은 마스터에서 무작위로 1개를 뽑아 붙인다 —
- * 추후 AI 분류가 이 무작위 선택을 대체한다. 무작위 선택은 앱(Facade) 레이어에서 하고, 엔티티는 고른 값을 저장만 한다.
+ * 전시 장르 키워드 마스터(회화·드로잉/사진/… 10종). 분류 결과가 이 집합 안의 값이 되도록 강제하는 단일 진실 원천이다.
+ * {@link GenreClassifier} 구현이 이 마스터를 사용한다 — {@code random()}은 랜덤 분류기의 선택지,
+ * {@code all()}은 AI 분류기(Gemini)의 허용 enum, {@code contains()}는 AI 응답 검증용이다.
  */
 public final class GenreKeyword {
 
@@ -17,13 +18,18 @@ public final class GenreKeyword {
 	private GenreKeyword() {
 	}
 
-	/** 마스터에서 무작위로 1개 선택. */
+	/** 마스터에서 무작위로 1개 선택(랜덤 분류기·AI 폴백용). */
 	public static String random() {
 		return MASTER.get(ThreadLocalRandom.current().nextInt(MASTER.size()));
 	}
 
-	/** 마스터 전체(참고·검증용). */
+	/** 마스터 전체(AI 분류기의 허용 enum·검증용). */
 	public static List<String> all() {
 		return MASTER;
+	}
+
+	/** 주어진 값이 마스터에 속하는지(AI 응답이 마스터를 벗어났는지 검증). */
+	public static boolean contains(String keyword) {
+		return keyword != null && MASTER.contains(keyword);
 	}
 }

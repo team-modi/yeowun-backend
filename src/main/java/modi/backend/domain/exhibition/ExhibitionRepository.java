@@ -33,6 +33,12 @@ public interface ExhibitionRepository {
 	/** 살아있는 전시들을 id 집합으로 일괄 조회(관심 전시 목록의 벌크 로드용). 정렬·순서 보장 없음. 빈 입력이면 빈 목록. */
 	List<Exhibition> findAllActiveByIds(Collection<Long> ids);
 
-	/** 홈 배너 후보 — {@code today} 기준 진행 중(startDate≤today≤endDate)인 CATALOG를 조회수 내림차순으로 최대 {@code limit}개. */
-	List<Exhibition> findOngoingBannerCandidates(LocalDate today, int limit);
+	/** 장르 초기화 백필용 — 아직 장르가 없는 CATALOG(공공데이터) 전시를 최대 {@code limit}건 조회(살아있는 행만). */
+	List<Exhibition> findCatalogWithoutGenre(int limit);
+
+	/**
+	 * 홈 배너용(03_전시.md E-10) — {@code onDate}에 진행 중(startDate ≤ onDate ≤ endDate)인 CATALOG 전시를
+	 * 조회수(ourViewCount) 내림차순으로 최대 {@code limit}건 조회한다(살아있는 행만).
+	 */
+	List<Exhibition> findOngoingCatalogTopByViews(LocalDate onDate, int limit);
 }

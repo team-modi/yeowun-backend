@@ -67,8 +67,16 @@ public class ExhibitionRepositoryImpl implements ExhibitionRepository {
 	}
 
 	@Override
-	public List<Exhibition> findOngoingBannerCandidates(LocalDate today, int limit) {
-		return jpaRepository.findOngoingByViewsDesc(ExhibitionType.CATALOG, today, PageRequest.of(0, limit));
+	public List<Exhibition> findCatalogWithoutGenre(int limit) {
+		return jpaRepository.findByTypeAndGenreKeywordIsNullAndDeletedAtIsNull(
+				ExhibitionType.CATALOG, PageRequest.of(0, Math.max(1, limit)));
+	}
+
+	@Override
+	public List<Exhibition> findOngoingCatalogTopByViews(LocalDate onDate, int limit) {
+		return jpaRepository
+				.findByTypeAndStartDateLessThanEqualAndEndDateGreaterThanEqualAndDeletedAtIsNullOrderByOurViewCountDesc(
+						ExhibitionType.CATALOG, onDate, onDate, PageRequest.of(0, Math.max(1, limit)));
 	}
 
 	/** sort 코드 → (정렬컬럼 nulls last, id) 결정적 정렬. 키셋 경계 조건과 순서가 일치해야 한다. */

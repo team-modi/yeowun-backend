@@ -1,13 +1,11 @@
 package modi.backend.infra.exhibition;
 
-import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
 
 import modi.backend.domain.exhibition.Exhibition;
 import modi.backend.domain.exhibition.ExhibitionType;
@@ -22,13 +20,14 @@ public interface ExhibitionJpaRepository
 	/** soft delete된 행은 제외하고 원천 식별자로 조회(동기화 upsert용). */
 	Optional<Exhibition> findByExternalIdAndDeletedAtIsNull(String externalId);
 
-	/** 진행 중(startDate≤today≤endDate)인 지정 타입 전시를 조회수 내림차순으로(홈 배너 후보). limit은 {@code pageable}로. */
-	@Query("""
-			select e from Exhibition e
-			where e.type = :type and e.deletedAt is null
-			  and e.startDate <= :today and e.endDate >= :today
-			order by e.ourViewCount desc, e.id desc
-			""")
-	java.util.List<Exhibition> findOngoingByViewsDesc(@Param("type") ExhibitionType type,
-			@Param("today") LocalDate today, Pageable pageable);
+	/** 장르 미부여 CATALOG를 페이지 크기만큼 조회(장르 초기화 백필용, 살아있는 행만). */
+	List<Exhibition> findByTypeAndGenreKeywordIsNullAndDeletedAtIsNull(ExhibitionType type, Pageable pageable);
+
+	/**
+	 * 홈 배너용 — 진행 중(startDate ≤ onDate ≤ endDate)인 CATALOG를 조회수 내림차순으로 페이지 크기만큼 조회(살아있는 행만).
+	 * 진행 중 조건은 두 날짜 파라미터에 동일한 오늘 값을 넘겨 표현한다.
+	 */
+	List<Exhibition> findByTypeAndStartDateLessThanEqualAndEndDateGreaterThanEqualAndDeletedAtIsNullOrderByOurViewCountDesc(
+			ExhibitionType type, java.time.LocalDate startOnOrBefore, java.time.LocalDate endOnOrAfter,
+			Pageable pageable);
 }

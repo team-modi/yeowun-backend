@@ -47,7 +47,7 @@ class ExhibitionDetailTest {
 		venueRepository = mock(modi.backend.domain.venue.VenueRepository.class);
 		recordJpaRepository = mock(RecordJpaRepository.class);
 		facade = new ExhibitionFacade(exhibitionRepository, catalogClient, bookmarkRepository, venueRepository,
-				recordJpaRepository);
+				recordJpaRepository, new modi.backend.infra.genre.RandomGenreClassifier());
 		given(exhibitionRepository.save(any(Exhibition.class))).willAnswer(invocation -> invocation.getArgument(0));
 	}
 

@@ -138,8 +138,11 @@ final class ExhibitionSpecifications {
 			return cb.and(cb.isNull(root.get("startDate")), cb.lessThan(root.<Long>get("id"), id));
 		}
 		LocalDate startDate = LocalDate.parse(key);
-		System.out.println("DBG_BOUNDARY latest key=" + key + " parsed=" + startDate + " id=" + id);
-		return cb.equal(root.<LocalDate>get("startDate"), LocalDate.of(2026, 7, 4));
+		// startDate desc nulls last, id desc → 커서 행보다 뒤: 시작일이 더 이르거나(desc), null(nulls last), 같으면 id가 더 작은 행.
+		return cb.or(
+				cb.lessThan(root.<LocalDate>get("startDate"), startDate),
+				cb.isNull(root.get("startDate")),
+				cb.and(cb.equal(root.get("startDate"), startDate), cb.lessThan(root.<Long>get("id"), id)));
 	}
 
 	private static Predicate endingBoundary(jakarta.persistence.criteria.Root<Exhibition> root,

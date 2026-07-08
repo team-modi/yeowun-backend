@@ -53,6 +53,7 @@ public final class ExhibitionResult {
 		public static Detail from(Exhibition exhibition, boolean bookmarked, boolean recorded) {
 			List<String> artists = exhibition.getArtist() == null || exhibition.getArtist().isBlank()
 					? List.of() : List.of(exhibition.getArtist());
+			// 장르 키워드(분류기가 부여)가 있으면 keywords로 노출. 미분류면 빈 배열.
 			List<String> keywords = exhibition.getGenreKeyword() == null || exhibition.getGenreKeyword().isBlank()
 					? List.of() : List.of(exhibition.getGenreKeyword());
 			return new Detail(exhibition.getId(), exhibition.getType().name(), exhibition.getTitle(),
@@ -68,11 +69,7 @@ public final class ExhibitionResult {
 		}
 	}
 
-	/** 홈 배너 목록(03_전시.md 5.1). 최대 3개, 없으면 빈 목록. */
-	public record Banners(List<Banner> banners) {
-	}
-
-	/** 홈 배너 항목(5.1). bannerImageUrl은 전시 posterUrl을 재사용한다. */
+	/** 홈 배너 항목(03_전시.md E-10). 배너 이미지는 전시 포스터(posterUrl)를 사용한다. */
 	public record Banner(Long exhibitionId, String title, String bannerImageUrl,
 			LocalDate startDate, LocalDate endDate, String place) {
 
@@ -82,7 +79,7 @@ public final class ExhibitionResult {
 		}
 	}
 
-	/** 개인 전시 등록 결과(03_전시.md 5.4). */
+	/** 개인 전시 등록 결과(03_전시.md 3.3.3). */
 	public record Created(Long exhibitionId, String type) {
 
 		public static Created from(Exhibition exhibition) {

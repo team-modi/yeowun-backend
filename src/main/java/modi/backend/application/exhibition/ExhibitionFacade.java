@@ -25,7 +25,8 @@ import modi.backend.domain.exhibition.ExhibitionQuery;
 import modi.backend.domain.exhibition.ExhibitionRegion;
 import modi.backend.domain.exhibition.ExhibitionRepository;
 import modi.backend.domain.exhibition.ExhibitionSection;
-import modi.backend.domain.exhibition.GenreKeyword;
+import modi.backend.domain.exhibition.GenreClassification;
+import modi.backend.domain.exhibition.GenreClassifier;
 import modi.backend.domain.venue.Venue;
 import modi.backend.domain.venue.VenueErrorCode;
 import modi.backend.domain.venue.VenueRepository;
@@ -56,6 +57,8 @@ public class ExhibitionFacade {
 	private final VenueRepository venueRepository;
 	// 크로스 도메인 실용 조회: 상세의 recorded 계산을 위해 record의 Spring Data 리포지토리를 직접 읽는다(전용 포트 미도입).
 	private final RecordJpaRepository recordJpaRepository;
+	/** 장르 분류 전략(랜덤/AI) — 주입되는 구현은 {@code app.exhibition.genre.classifier}로 선택된다(@Primary). */
+	private final GenreClassifier genreClassifier;
 
 	/**
 	 * 목록/탐색(5.2). 필터 미지정 시 오늘 진행 중인 전시를 기본 노출한다. 비로그인은 CATALOG만.
@@ -95,6 +98,16 @@ public class ExhibitionFacade {
 		String nextCursor = hasNext ? encodeCursor(sort, page.get(page.size() - 1)) : null;
 		long totalCount = exhibitionRepository.count(query);
 		return new ExhibitionResult.ListPage(content, nextCursor, hasNext, totalCount);
+	}
+
+	/**
+	 * 홈 배너(03_전시.md E-10). 운영자 지정 기능은 아직 없어, 오늘 진행 중인 전시 중 조회수 상위 최대 3개를 노출한다.
+	 * 진행 중 전시가 없으면 빈 배열을 반환한다(홈은 배너 부재 시 섹션만 노출).
+	 */
+	@Transactional(readOnly = true)
+	public List<ExhibitionResult.Banner> banners() {
+		return exhibitionRepository.findOngoingCatalogTopByViews(LocalDate.now(AppTime.KST), BANNER_LIMIT)
+				.stream().map(ExhibitionResult.Banner::from).toList();
 	}
 
 	/**
@@ -188,22 +201,37 @@ public class ExhibitionFacade {
 				region = venue.getRegion();
 			}
 		}
+		// 장르는 분류기(랜덤/AI)가 부여한다. 분류기는 실패해도 예외를 던지지 않고 유효 장르를 반환하므로 등록 흐름을 깨지 않는다.
+		String genreKeyword = genreClassifier.classify(new GenreClassification(criteria.title(),
+				category == null ? null : category.name(), null, place, criteria.artist(), null));
 		Exhibition exhibition = Exhibition.createCustom(criteria.ownerId(), criteria.title(), place,
 				criteria.startDate(), criteria.endDate(), region, category, format, criteria.artist(),
-				criteria.posterUrl(), GenreKeyword.random());
+				criteria.posterUrl(), genreKeyword);
 		return ExhibitionResult.Created.from(exhibitionRepository.save(exhibition));
 	}
 
 	/**
-	 * 홈 배너(5.1). 운영자 지정 테이블이 없어, 오늘 진행 중인 CATALOG 전시를 조회수 상위로 최대 3개 노출한다.
-	 * bannerImageUrl은 전시 posterUrl을 재사용한다. 후보가 없으면 빈 목록(에러 아님).
+	 * 장르 초기화 백필 — 아직 장르가 없는 CATALOG(공공데이터) 전시를 최대 {@code max}건 분류기(랜덤/AI)로 채운다.
+	 * 부팅 시 {@code ExhibitionGenreInitializer}가 호출한다. 분류기가 폴백을 보장하므로 개별 실패로 중단되지 않으며,
+	 * 무료 한도(429)로 일부가 랜덤 폴백되어도 다음 실행에서 다시 시도한다(장르가 채워진 행은 대상에서 빠짐).
+	 *
+	 * @return 이번 실행으로 장르를 부여한 전시 수
 	 */
-	@Transactional(readOnly = true)
-	public ExhibitionResult.Banners banners() {
-		LocalDate today = LocalDate.now(AppTime.KST);
-		List<ExhibitionResult.Banner> items = exhibitionRepository.findOngoingBannerCandidates(today, BANNER_LIMIT)
-				.stream().map(ExhibitionResult.Banner::from).toList();
-		return new ExhibitionResult.Banners(items);
+	@Transactional
+	public int initGenres(int max) {
+		List<Exhibition> targets = exhibitionRepository.findCatalogWithoutGenre(max);
+		if (targets.isEmpty()) {
+			return 0;
+		}
+		// 전시마다 호출하지 않고 한 번의 AI 호출(배치)로 전부 분류한다 — 무료 한도 429 폭주·부팅 지연 방지.
+		List<GenreClassification> inputs = targets.stream().map(GenreClassification::from).toList();
+		List<String> genres = genreClassifier.classifyAll(inputs);
+		for (int i = 0; i < targets.size(); i++) {
+			Exhibition exhibition = targets.get(i);
+			exhibition.applyGenre(i < genres.size() ? genres.get(i) : null);
+			exhibitionRepository.save(exhibition);
+		}
+		return targets.size();
 	}
 
 	/**

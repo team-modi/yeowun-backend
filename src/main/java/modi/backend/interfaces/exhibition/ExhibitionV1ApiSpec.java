@@ -124,6 +124,32 @@ public interface ExhibitionV1ApiSpec {
 			@Parameter(description = "페이지 크기(기본 20, 최대 50)", example = "20") Integer size,
 			@Parameter(hidden = true) Optional<LoginUser> loginUser);
 
+	@Operation(summary = "홈 배너 조회", description = """
+			홈 상단 캐러셀용 배너를 최대 3개 조회한다(03_전시.md E-10). 공개 API(인증 불필요).
+			현재는 오늘 진행 중인 전시 중 조회수 상위 최대 3개를 노출한다(운영자 지정 기능은 추후).
+			진행 중 전시가 없으면 data.banners는 빈 배열이다.
+			홈 화면은 이 배너 1콜과 섹션 조회(GET /exhibitions?section=...) 3콜을 병렬로 호출한다.""")
+	@ApiResponses(@ApiResponse(responseCode = "200", description = "조회 성공", content = @Content(
+			mediaType = MediaType.APPLICATION_JSON_VALUE,
+			schema = @Schema(implementation = ExhibitionDto.BannersResponse.class),
+			examples = @ExampleObject(name = "배너 조회 성공", value = """
+					{
+					  "meta": { "result": "SUCCESS", "errorCode": null, "message": null },
+					  "data": {
+					    "banners": [
+					      {
+					        "exhibitionId": 51,
+					        "title": "모네: 빛을 그리다",
+					        "bannerImageUrl": "https://cdn.modi.app/exhibitions/51/poster.jpg",
+					        "startDate": "2026-06-01",
+					        "endDate": "2026-08-31",
+					        "place": "예술의전당 한가람미술관"
+					      }
+					    ]
+					  }
+					}"""))))
+	ResponseEntity<modi.backend.support.response.ApiResponse<ExhibitionDto.BannersResponse>> banners();
+
 	@Operation(summary = "전시 상세", description = """
 			CATALOG는 공개, CUSTOM은 등록자 본인만 조회 가능. 인증은 선택(Optional) —
 			비로그인·무효 토큰이어도 CATALOG 전시는 정상 조회된다. 로그인 시 bookmarked·recorded 개인화 필드를 채운다.""")
@@ -231,30 +257,4 @@ public interface ExhibitionV1ApiSpec {
 			@Parameter(hidden = true) LoginUser user,
 			ExhibitionDto.CustomCreateRequest request);
 
-	@Operation(summary = "홈 배너 조회", description = """
-			홈 캐러셀용 배너를 최대 3개 반환한다(인증 불필요). 운영자 지정 테이블이 없어 오늘 진행 중인 CATALOG 전시를
-			조회수 상위로 채운다. bannerImageUrl은 전시 포스터 URL을 재사용한다. 배너가 없으면 빈 배열(에러 아님).""")
-	@ApiResponses({
-			@ApiResponse(responseCode = "200", description = "조회 성공(배너 없으면 빈 배열)", content = @Content(
-					mediaType = MediaType.APPLICATION_JSON_VALUE,
-					schema = @Schema(implementation = ExhibitionDto.BannersResponse.class),
-					examples = @ExampleObject(name = "배너 조회 성공", value = """
-							{
-							  "meta": { "result": "SUCCESS", "errorCode": null, "message": null },
-							  "data": {
-							    "banners": [
-							      {
-							        "exhibitionId": 3,
-							        "title": "인상주의를 넘어",
-							        "bannerImageUrl": "https://cdn.modi.app/exhibitions/3/poster.jpg",
-							        "startDate": "2026-05-28",
-							        "endDate": "2026-08-23",
-							        "place": "세종문화회관 미술관"
-							      }
-							    ]
-							  }
-							}
-							"""))),
-	})
-	ResponseEntity<modi.backend.support.response.ApiResponse<ExhibitionDto.BannersResponse>> banners();
 }
