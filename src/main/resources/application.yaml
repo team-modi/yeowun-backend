@@ -92,7 +92,7 @@ app:
     #   상세: 상세 미수집 행을 상세 API로 채워 price를 확보(무료 섹션이 실제로 뜨게 하는 근본 값).
     #   부팅 직후(startup-delay-ms) 1차 실행 + 이후 interval-ms 주기. 스케줄러라 배포 readiness/헬스체크를 막지 않는다.
     enrich:
-      genre-batch-size: ${ENRICH_GENRE_BATCH_SIZE:40}
+      genre-batch-size: ${ENRICH_GENRE_BATCH_SIZE:20}  # 60s 타임아웃 안에서 검증된 크기(키우면 ReadTimeout→랜덤 폴백 위험)
       genre-max-batches-per-run: ${ENRICH_GENRE_MAX_BATCHES:20}
       detail-max-per-run: ${ENRICH_DETAIL_MAX_PER_RUN:150}
       startup-delay-ms: ${ENRICH_STARTUP_DELAY_MS:15000}

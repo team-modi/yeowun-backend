@@ -18,7 +18,9 @@ public record CatalogEnrichProperties(Integer genreBatchSize, Integer genreMaxBa
 
 	public CatalogEnrichProperties {
 		if (genreBatchSize == null || genreBatchSize <= 0) {
-			genreBatchSize = 40;
+			// 20건은 60s 타임아웃 안에서 검증된 배치 크기(더 키우면 모델 사고 토큰↑ → ReadTimeout → 전량 랜덤 폴백 위험).
+			// AI 품질(진짜 분류) 보존을 위해 20 유지 — 273건도 ~14콜(개당 273콜 대비 충분히 저렴).
+			genreBatchSize = 20;
 		}
 		if (genreMaxBatchesPerRun == null || genreMaxBatchesPerRun <= 0) {
 			genreMaxBatchesPerRun = 20;
