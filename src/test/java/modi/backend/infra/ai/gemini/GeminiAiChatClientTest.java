@@ -45,6 +45,16 @@ class GeminiAiChatClientTest {
 	}
 
 	@Test
+	@DisplayName("생성자가 둘이므로 Spring 주입용 생성자 하나만 @Autowired여야 한다(빈 생성 회귀 방지)")
+	void hasExactlyOneAutowiredConstructor() {
+		long autowired = java.util.Arrays.stream(GeminiAiChatClient.class.getDeclaredConstructors())
+				.filter(c -> c.isAnnotationPresent(org.springframework.beans.factory.annotation.Autowired.class))
+				.count();
+		// 생성자가 여러 개면 Spring이 주입 생성자를 못 골라 기본 생성자를 찾다 실패한다 → 정확히 하나만 표시.
+		assertThat(autowired).isEqualTo(1);
+	}
+
+	@Test
 	@DisplayName("5xx(503) 후 재시도가 성공하면 텍스트를 반환한다")
 	void complete_5xxThenSuccess_returnsText() {
 		server.enqueue(new MockResponse().setResponseCode(503).setBody("{\"error\":{\"code\":503}}"));

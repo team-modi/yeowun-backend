@@ -8,6 +8,7 @@ import java.util.function.Supplier;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -44,6 +45,8 @@ public class GeminiAiChatClient implements AiChatClient {
 	private final ObjectMapper objectMapper;
 	private final WebClient webClient; // api-key 미설정 시 null
 
+	// 생성자가 둘(운영·테스트)이라 Spring이 주입 생성자를 못 고른다 → 운영용 public을 @Autowired로 명시.
+	@Autowired
 	public GeminiAiChatClient(AiProperties properties, MeterRegistry meterRegistry, ObjectMapper objectMapper) {
 		this(properties, meterRegistry, objectMapper, BASE_URL);
 	}
