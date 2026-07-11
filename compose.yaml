@@ -120,8 +120,9 @@ services:
     volumes:
       - 'metabase-data:/metabase-data'
     ports:
-      # 호스트엔 루프백만(직접 외부 노출 금지). 외부 공개는 cloudflared가 담당.
-      - '127.0.0.1:3001:3000'
+      # 기본은 루프백만(로컬 안전). 운영에서 EC2 Public IP로 직접 공개할 땐 MB_HOST_PORT=3000(=0.0.0.0:3000)으로 오버라이드.
+      #   ⚠️ public 노출은 http 평문 — 보안그룹으로 접근 IP를 제한할 것. HTTPS가 필요하면 cloudflared(터널) 경유.
+      - '${MB_HOST_PORT:-127.0.0.1:3001}:3000'
     restart: unless-stopped
 
   # Cloudflare Tunnel — Metabase를 HTTPS 고정 주소로 외부 공개(팀 상시 접속). 도커 소켓/포트 개방 불필요.

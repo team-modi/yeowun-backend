@@ -55,13 +55,16 @@ jobs:
           MB_SITE_URL: ${{ secrets.MB_SITE_URL }}
           # (대안) 도메인 없이 quick tunnel로 metabase 공개. "true"면 활성(URL은 배포 로그/컨테이너 로그에서 확인, 재시작 시 변경).
           CF_QUICK_TUNNEL: ${{ secrets.CF_QUICK_TUNNEL }}
+          # (대안2) 터널 없이 EC2 Public IP로 Metabase 직접 공개. "true"면 analytics 프로파일을 0.0.0.0:3000으로 노출.
+          #   ⚠️ http 평문 — 반드시 EC2 보안그룹 인바운드 3000을 신뢰 IP로 제한할 것.
+          ENABLE_METABASE: ${{ secrets.ENABLE_METABASE }}
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           command_timeout: 20m
           # GitHub Actions secrets를 원격 SSH 세션 환경변수로 전달
-          envs: KAKAO_CLIENT_SECRET,GOOGLE_CLIENT_SECRET,JWT_SECRET,GEMINI_API_KEY,ANTHROPIC_API_KEY,GC_PROM_URL,GC_PROM_USER,GC_API_KEY,GC_LOKI_URL,GC_LOKI_USER,CF_TUNNEL_TOKEN,MB_SITE_URL,CF_QUICK_TUNNEL
+          envs: KAKAO_CLIENT_SECRET,GOOGLE_CLIENT_SECRET,JWT_SECRET,GEMINI_API_KEY,ANTHROPIC_API_KEY,GC_PROM_URL,GC_PROM_USER,GC_API_KEY,GC_LOKI_URL,GC_LOKI_USER,CF_TUNNEL_TOKEN,MB_SITE_URL,CF_QUICK_TUNNEL,ENABLE_METABASE
           script: |
             set -e
             cd ~/modi-backend
@@ -118,6 +121,13 @@ jobs:
               PROFILES="$PROFILES --profile analytics --profile tunnel-quick"
               QUICK_TUNNEL=1
               echo "📊 Metabase + Cloudflare quick tunnel 활성화 (URL은 아래 로그에서 확인, 재시작 시 변경)"
+            elif [ "${ENABLE_METABASE}" = "true" ]; then
+              # 터널 없이 EC2 Public IP로 Metabase 직접 노출: 호스트 0.0.0.0:3000 바인딩 + 사이트 URL을 공개 IP로.
+              #   ⚠️ http 평문 — 반드시 EC2 보안그룹 인바운드 3000을 신뢰 IP로 제한할 것.
+              PROFILES="$PROFILES --profile analytics"
+              echo "MB_HOST_PORT=3000" >> .env
+              sed -i 's|^MB_SITE_URL=.*|MB_SITE_URL=http://3.35.111.143:3000|' .env
+              echo "📊 Metabase public 노출 활성화 → http://3.35.111.143:3000 (EC2 보안그룹 인바운드 3000 개방 필요)"
             fi
             sudo docker compose $PROFILES up -d --build
 
