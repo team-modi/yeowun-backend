@@ -118,6 +118,11 @@ app:
   remind:
     eligible-after: ${REMIND_ELIGIBLE_AFTER:7d}
 
+  # 관리자 콘솔 접근 화이트리스트(role 개념 없음). 이 목록의 유저ID만 /api-admin/** 접근 가능.
+  #   미설정이면 아무도 관리자 아님 → 모든 admin 요청 403(안전 기본값). env로 주입: ADMIN_USER_IDS=1,2
+  admin:
+    user-ids: ${ADMIN_USER_IDS:}
+
   # AI 감상문 생성(질문/compose). provider 교체 가능 — claude(Anthropic) | gemini(Google).
   #   AI_PROVIDER로 어댑터를 전환한다(코드 변경 불필요). 예: AI_PROVIDER=gemini.
   #   api-key 미설정이면 AI 엔드포인트는 503(AI_DISABLED)로 응답하고 나머지 기능은 정상 동작한다.
