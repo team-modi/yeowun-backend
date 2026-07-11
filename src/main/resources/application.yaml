@@ -98,6 +98,11 @@ app:
       genre-max-batches-per-run: ${ENRICH_GENRE_MAX_BATCHES:3}  # 회당 소량 → 무료 RPM 안 넘김(대량 백로그는 다음 동기화가 이어서 소진)
       detail-max-per-run: ${ENRICH_DETAIL_MAX_PER_RUN:150}
 
+  # 리마인드(오늘의 여운) — 기록 작성 후 소환 대상이 되기까지의 경과 시간. 스케줄 발송이 아니라 조회 시점 판정(pull)이라
+  #   이 값만 바꾸면 즉시 반영된다. 정식 기본 7d(운영 베타 한정 단축은 prod 프로파일 참고).
+  remind:
+    eligible-after: ${REMIND_ELIGIBLE_AFTER:7d}
+
   # AI 감상문 생성(질문/compose). provider 교체 가능 — claude(Anthropic) | gemini(Google).
   #   AI_PROVIDER로 어댑터를 전환한다(코드 변경 불필요). 예: AI_PROVIDER=gemini.
   #   api-key 미설정이면 AI 엔드포인트는 503(AI_DISABLED)로 응답하고 나머지 기능은 정상 동작한다.
@@ -153,6 +158,10 @@ app:
     # 운영에서만 실제 AI(gemini) 장르 분류를 쓴다. develop·로컬(기본 프로파일)은 random(무비용). 필요 시 env로 override.
     genre:
       classifier: ${GENRE_CLASSIFIER:gemini}
+  # ⚠️ 베타 한정: 리마인드 소환 대기를 1분으로 단축(2~3일 베타에서 즉시 검증용, 리마인드는 조회 시점 판정이라 값만 줄이면 됨).
+  #   베타 종료 후 REMIND_ELIGIBLE_AFTER=7d 주입(또는 이 줄 제거로 기본 7d 복귀).
+  remind:
+    eligible-after: ${REMIND_ELIGIBLE_AFTER:1m}
   cors:
     allowed-origin-patterns:
       - https://yeowun.vercel.app      # 여운 Vercel 운영 도메인
