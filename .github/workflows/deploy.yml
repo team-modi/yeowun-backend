@@ -152,8 +152,9 @@ jobs:
             # 배포 후 헬스체크 검증: UP 될 때까지 최대 150초 폴링, 실패 시 로그 출력하고 배포 실패 처리
             # 운영 호스트 노출 포트 = 8080(.env의 APP_HOST_PORT=8080 → compose가 8080:8080으로 매핑).
             # 공개 주소(3.35.111.143:8080)와 동일 포트라 헬스체크도 8080. (로컬 도커는 18090이지만 배포는 prod 기준)
+            # 1GB 박스는 부팅(컨텍스트 초기화)이 느려 150초를 넘길 수 있다 → 300초(60회×5초)까지 대기해 오탐 실패 방지.
             echo "Waiting for app to become healthy..."
-            for i in $(seq 1 30); do
+            for i in $(seq 1 60); do
               if curl -fsS http://localhost:8080/actuator/health | grep -q '"status":"UP"'; then
                 echo "✅ Health check passed"
                 sudo docker compose $PROFILES ps
@@ -164,7 +165,7 @@ jobs:
                 fi
                 exit 0
               fi
-              echo "  ...not ready yet ($i/30)"
+              echo "  ...not ready yet ($i/60)"
               sleep 5
             done
             echo "❌ Health check FAILED after timeout"
