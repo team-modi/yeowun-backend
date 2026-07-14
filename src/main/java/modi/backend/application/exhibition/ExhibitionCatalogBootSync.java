@@ -45,6 +45,8 @@ public class ExhibitionCatalogBootSync implements ApplicationRunner {
 			} catch (RuntimeException e) {
 				log.warn("부팅 시 장르 분류 실패(자정 동기화에서 재시도): {}", e.getMessage());
 			}
+			// 영업시간 보강은 부팅에서 하지 않는다 — 매 재시작마다 (운영 google 시) 유료 호출을 재발하지 않도록
+			// 매일 자정 스케줄러({@link ExhibitionSyncScheduler})에서만 수행한다(신규/만료 장소만).
 		}, "catalog-boot-sync");
 		bootSync.setDaemon(true);
 		bootSync.start();
