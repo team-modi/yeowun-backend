@@ -1,11 +1,17 @@
 package modi.backend.application.exhibition;
 
+import java.time.LocalDateTime;
+import java.util.List;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import lombok.RequiredArgsConstructor;
 import modi.backend.config.CatalogEnrichProperties;
+import modi.backend.domain.exhibition.GenreClassification;
+import modi.backend.domain.exhibition.GenreClassifier;
+import modi.backend.domain.exhibition.GenreResult;
 
 /**
  * 공공데이터(CATALOG) 장르 보강 오케스트레이션.
@@ -23,6 +29,8 @@ public class CatalogEnricher {
 
 	private final ExhibitionFacade exhibitionFacade;
 	private final CatalogEnrichProperties properties;
+	/** 장르 분류 전략(랜덤/AI) — 주입되는 구현은 {@code app.exhibition.genre.classifier}로 선택된다(@Primary). */
+	private final GenreClassifier genreClassifier;
 
 	/**
 	 * 미분류 CATALOG 장르를 배치로 상한 내 전량 백필. 각 배치는 AI 1회 호출(배치가 batchSize 미만이면 미분류 소진 → 종료).
@@ -33,7 +41,7 @@ public class CatalogEnricher {
 		int batchSize = properties.genreBatchSize();
 		int total = 0;
 		for (int i = 0; i < properties.genreMaxBatchesPerRun(); i++) {
-			int classified = exhibitionFacade.initGenres(batchSize);
+			int classified = classifyBatch(batchSize);
 			total += classified;
 			if (classified < batchSize) {
 				break; // 남은 미분류 없음 → 조기 종료(빈 배치로 AI를 태우지 않음)
@@ -43,5 +51,20 @@ public class CatalogEnricher {
 			log.info("전시 장르 백필 {}건", total);
 		}
 		return total;
+	}
+
+	/**
+	 * 한 배치: [조회 tx] → <b>tx 밖 AI 호출</b> → [반영 tx]. AI 호출이 트랜잭션 밖에 있어야 하는 이유 —
+	 * 배치 1콜은 최대 60초 + 429 재시도 백오프(Thread.sleep)까지 걸리는데, 트랜잭션 안이면 그동안 DB 커넥션을 점유한다.
+	 * 전시마다 호출하지 않고 배치당 1콜로 묶는 것은 무료 한도 429 폭주·부팅 지연 방지 때문이다.
+	 */
+	private int classifyBatch(int batchSize) {
+		List<GenreTarget> targets = exhibitionFacade.findGenreTargets(batchSize);
+		if (targets.isEmpty()) {
+			return 0;
+		}
+		List<GenreClassification> inputs = targets.stream().map(GenreTarget::classification).toList();
+		List<GenreResult> results = genreClassifier.classifyAll(inputs);
+		return exhibitionFacade.applyGenres(targets, results, LocalDateTime.now());
 	}
 }
