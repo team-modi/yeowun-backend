@@ -551,29 +551,36 @@ public class ExhibitionFacade {
 			applyDetailOrCheck(existing);
 			return SyncOutcome.COMPLETED;
 		}
+		// 신규는 상세를 <b>먼저</b> 받아본다 — 상세 호출이 일시 실패하면 아무것도 적재하지 않고 이 행만 다음 주기로 연기한다
+		// (불완전한 행·전시장만 남기지 않는다). 상세가 성공/빈 응답일 때만 전시장 resolve + 전시·상세 적재로 진행한다.
+		java.util.Optional<CatalogDetailData> detail = fetchDetailDeferring(data.externalId());
 		ExhibitionPlace place = resolvePlace(data.place(), data.region(), data.sigungu(), data.gpsX(), data.gpsY());
-		Exhibition created = Exhibition.createCatalog(data.externalId(), data.title(), place.getId(),
-				data.startDate(), data.endDate(), data.category(), data.posterUrl(), data.detailUrl(),
-				data.serviceName());
-		Exhibition saved = exhibitionRepository.save(created);
-		applyDetailOrCheck(saved);
+		Exhibition saved = exhibitionRepository.save(Exhibition.createCatalog(data.externalId(), data.title(),
+				place.getId(), data.startDate(), data.endDate(), data.category(), data.posterUrl(), data.detailUrl(),
+				data.serviceName()));
+		LocalDateTime now = LocalDateTime.now();
+		detail.ifPresentOrElse(d -> applyCatalogDetail(saved, d, now), () -> saveCheckedDetail(saved.getId(), now));
+		archiveDetailOutcome(data.externalId(), detail.orElse(null));
 		return SyncOutcome.INSERTED;
 	}
 
-	/** 원천 상세2를 받아 상세를 채우거나(있음), 상세 미보유(빈 응답)면 확인 완료행만 남긴다. 일시 실패는 예외로 전파된다. */
+	/** 원천 상세2를 받아 상세를 채우거나(있음), 상세 미보유(빈 응답)면 확인 완료행만 남긴다. 일시 실패는 예외로 전파된다(기존 행 완성 경로). */
 	private void applyDetailOrCheck(Exhibition exhibition) {
-		String externalId = exhibition.getExternalId();
-		java.util.Optional<CatalogDetailData> detail;
+		java.util.Optional<CatalogDetailData> detail = fetchDetailDeferring(exhibition.getExternalId());
+		LocalDateTime now = LocalDateTime.now();
+		detail.ifPresentOrElse(d -> applyCatalogDetail(exhibition, d, now),
+				() -> saveCheckedDetail(exhibition.getId(), now));
+		archiveDetailOutcome(exhibition.getExternalId(), detail.orElse(null));
+	}
+
+	/** 상세를 조회한다. 일시 실패면 벤더층에 "시도했고 실패했다"를 남기고 예외를 전파해 호출부가 이 행만 연기하게 한다. */
+	private java.util.Optional<CatalogDetailData> fetchDetailDeferring(String externalId) {
 		try {
-			detail = catalogClient.fetchDetail(externalId);
+			return catalogClient.fetchDetail(externalId);
 		} catch (RuntimeException e) {
 			archiveDetailFailure(externalId);
 			throw e;
 		}
-		LocalDateTime now = LocalDateTime.now();
-		detail.ifPresentOrElse(d -> applyCatalogDetail(exhibition, d, now),
-				() -> saveCheckedDetail(exhibition.getId(), now));
-		archiveDetailOutcome(externalId, detail.orElse(null));
 	}
 
 	/** 상세 값을 상세 satellite에 upsert하고, 전시장 보강 필드(주소/전화/홈페이지)를 채운다. */
