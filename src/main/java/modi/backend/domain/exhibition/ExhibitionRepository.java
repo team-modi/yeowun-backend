@@ -41,16 +41,6 @@ public interface ExhibitionRepository {
 	List<Exhibition> findCatalogWithoutGenre(int limit);
 
 	/**
-	 * 영업시간 보강 대상 — 주소(placeAddr)가 있고 아직 조회 안 했거나({@code operatingHoursSyncedAt IS NULL})
-	 * {@code staleBefore}보다 오래 전에 조회된 CATALOG 전시를 최대 {@code limit}건 조회(살아있는 행만).
-	 * 같은 장소를 묶기 쉽도록 placeAddr·id 순으로 정렬해 반환한다.
-	 */
-	List<Exhibition> findCatalogNeedingOperatingHours(LocalDateTime staleBefore, int limit);
-
-	/** 설명 재파싱용 — 설명이 있는 CATALOG 전시를 모두 조회(살아있는 행만). 재파싱 대상 판단은 호출부(멱등). */
-	List<Exhibition> findCatalogWithDescription();
-
-	/**
 	 * 홈 배너용(03_전시.md E-10) — {@code onDate}에 진행 중(startDate ≤ onDate ≤ endDate)인 CATALOG 전시를
 	 * 조회수(ourViewCount) 내림차순으로 최대 {@code limit}건 조회한다(살아있는 행만).
 	 */

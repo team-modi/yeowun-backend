@@ -74,17 +74,6 @@ public class ExhibitionRepositoryImpl implements ExhibitionRepository {
 	}
 
 	@Override
-	public List<Exhibition> findCatalogNeedingOperatingHours(java.time.LocalDateTime staleBefore, int limit) {
-		return jpaRepository.findCatalogNeedingOperatingHours(
-				ExhibitionType.CATALOG, staleBefore, PageRequest.of(0, Math.max(1, limit)));
-	}
-
-	@Override
-	public List<Exhibition> findCatalogWithDescription() {
-		return jpaRepository.findByTypeAndDescriptionIsNotNullAndDeletedAtIsNull(ExhibitionType.CATALOG);
-	}
-
-	@Override
 	public List<Exhibition> findOngoingCatalogTopByViews(LocalDate onDate, int limit) {
 		return jpaRepository
 				.findByTypeAndStartDateLessThanEqualAndEndDateGreaterThanEqualAndDeletedAtIsNullOrderByOurViewCountDesc(
