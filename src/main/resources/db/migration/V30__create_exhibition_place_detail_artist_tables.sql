@@ -71,9 +71,9 @@ create unique index uk_exhibition_artists on exhibition_artists (exhibition_id, 
 alter table exhibitions
     add column exhibition_place_id bigint null;
 
+-- synced_at은 파이프라인 브랜치 V27이 이미 추가했다(이벤트 구동 재검증 최소간격 기준) — 여기선 조인 키만 추가한다.
 alter table place_hours
-    add column exhibition_place_id bigint null,
-    add column synced_at datetime(6) null;
+    add column exhibition_place_id bigint null;
 
 alter table google_place_response
     add column exhibition_place_id bigint null;

@@ -67,6 +67,14 @@ public class ExhibitionRepositoryImpl implements ExhibitionRepository {
 	}
 
 	@Override
+	public List<Exhibition> findAllByExternalIds(Collection<String> externalIds) {
+		if (externalIds == null || externalIds.isEmpty()) {
+			return List.of();
+		}
+		return jpaRepository.findByTypeAndExternalIdInAndDeletedAtIsNull(ExhibitionType.CATALOG, externalIds);
+	}
+
+	@Override
 	public List<Exhibition> findCatalogWithoutGenre(int limit) {
 		// "장르 없음"의 판정 위치가 정준층(exhibition_genre)으로 옮겨졌다 — 포트 메서드명(도메인 언어)은 그대로다.
 		return jpaRepository.findCatalogWithoutCanonicalGenre(

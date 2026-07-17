@@ -76,7 +76,7 @@ class ExhibitionDetailTest {
 				new modi.backend.infra.genre.RandomGenreClassifier(), exhibitionGenreRepository,
 				mock(CultureListResponseRepository.class), mock(CultureDetailResponseRepository.class),
 				mock(SyncRunRepository.class), placeRepository, detailRepository, mock(ArtistRepository.class),
-				exhibitionArtistRepository);
+				exhibitionArtistRepository, mock(EnrichmentJobFacade.class));
 		given(exhibitionRepository.save(any(Exhibition.class))).willAnswer(invocation -> invocation.getArgument(0));
 		given(placeRepository.findById(anyLong())).willReturn(Optional.of(
 				ExhibitionPlace.createFromList("장소", null, null, null, null)));

@@ -54,12 +54,10 @@ where e.artist is not null and trim(e.artist) <> ''
 
 -- 5) 정준층(place_hours) 조인 키 이관 — 운영 DB엔 place_key(=주소) 기준 데이터가 있을 수 있다(핸드오프 주의).
 --    place_key(주소) → 그 주소 전시의 exhibition_place_id 로 매핑. 같은 주소가 여러 전시장 이름에 걸리면 min으로 결정적 선택.
---    synced_at은 그 장소 전시들의 operating_hours_synced_at 최대값으로 채운다(대상 선별의 기준 시각).
+--    synced_at은 파이프라인 V27이 이미 백필했으므로 여기서 건드리지 않는다(재검증 최소간격 기준 = V27 소유).
 update place_hours h
 set h.exhibition_place_id = (
-        select min(e.exhibition_place_id) from exhibitions e where e.place_key = h.place_key),
-    h.synced_at = (
-        select max(e.operating_hours_synced_at) from exhibitions e where e.place_key = h.place_key)
+        select min(e.exhibition_place_id) from exhibitions e where e.place_key = h.place_key)
 where h.exhibition_place_id is null
   and exists (select 1 from exhibitions e where e.place_key = h.place_key);
 
