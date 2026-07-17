@@ -60,6 +60,15 @@ public class PlaceHours {
 	private int attemptCount;
 
 	/**
+	 * 마지막 조회(성공·미발견 불문) 시각 — <b>이벤트 구동 재검증의 최소 간격 판정 기준</b>(설계 §1·§4-1).
+	 * 새 전시가 기존 장소에 들어와 HOURS_REFRESH를 걸 때, 이 값이 최근이면(설정 간격 이내) enqueue를 건너뛴다
+	 * (카탈로그 sync 한 번에 유료 호출이 burst하지 않도록). 전송 실패({@link PlaceHoursStatus#FAILED})는
+	 * 갱신하지 않는다 — "성공적으로 확인한 시각"이 아니어야 다음 주기에 다시 시도된다.
+	 */
+	@Column(name = "synced_at")
+	private LocalDateTime syncedAt;
+
+	/**
 	 * 다음 재시도 도래 시각. <b>이관 4단계에서는 항상 null이다</b> — 대상 선별은 아직
 	 * {@code exhibitions.operating_hours_synced_at}이 맡는다(구조 이관과 동작 변경을 섞지 않는다).
 	 * 백오프 정책은 이 테이블이 선별을 맡는 단계에서 정한다 — 읽는 곳이 없는 지금 값을 지어내면,
@@ -68,18 +77,20 @@ public class PlaceHours {
 	@Column(name = "next_attempt_at")
 	private LocalDateTime nextAttemptAt;
 
-	private PlaceHours(String placeKey, String formatted, PlaceHoursStatus status, PlaceHoursVendor provider) {
+	private PlaceHours(String placeKey, String formatted, PlaceHoursStatus status, PlaceHoursVendor provider,
+			LocalDateTime syncedAt) {
 		this.placeKey = placeKey;
 		this.formatted = formatted;
 		this.status = status;
 		this.provider = provider;
 		this.attemptCount = 1;
+		this.syncedAt = status == PlaceHoursStatus.FAILED ? null : syncedAt;
 	}
 
 	/** 조회 결과로 장소 행을 처음 만든다. */
 	public static PlaceHours first(String placeKey, String formatted, PlaceHoursStatus status,
-			PlaceHoursVendor provider) {
-		return new PlaceHours(placeKey, formatted, status, provider);
+			PlaceHoursVendor provider, LocalDateTime syncedAt) {
+		return new PlaceHours(placeKey, formatted, status, provider, syncedAt);
 	}
 
 	/**
@@ -89,12 +100,14 @@ public class PlaceHours {
 	 * 사용자에게 보이던 영업시간이 사라지면, 부가 기능의 일시 장애가 서비스 후퇴가 된다. 상태만 남기고 값은 지킨다.
 	 * 반대로 NOT_FOUND·NO_HOURS는 <b>벤더가 "없다"고 답한 것</b>이라 값을 비우는 게 사실에 맞다.
 	 */
-	public void refresh(String formatted, PlaceHoursStatus status, PlaceHoursVendor provider) {
+	public void refresh(String formatted, PlaceHoursStatus status, PlaceHoursVendor provider, LocalDateTime syncedAt) {
 		this.attemptCount++;
 		this.status = status;
 		this.provider = provider;
 		if (status != PlaceHoursStatus.FAILED) {
 			this.formatted = formatted;
+			// 성공적으로 확인한 시각만 남긴다 — 전송 실패는 갱신하지 않아 다음 주기 재시도가 유지된다(재검증 최소 간격 판정도 정확).
+			this.syncedAt = syncedAt;
 		}
 	}
 

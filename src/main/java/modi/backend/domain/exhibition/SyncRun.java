@@ -4,6 +4,8 @@ import java.time.LocalDateTime;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -37,6 +39,11 @@ public class SyncRun {
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Long id;
 
+	/** 이 실행을 촉발한 계기(BOOT/SCHEDULE/MANUAL) — "왜 이 시각에 돌았나"를 남긴다. */
+	@Enumerated(EnumType.STRING)
+	@Column(name = "trigger_type", nullable = false, length = 20)
+	private SyncTrigger triggerType;
+
 	@Column(name = "started_at")
 	private LocalDateTime startedAt;
 
@@ -66,13 +73,14 @@ public class SyncRun {
 	@Column(name = "deferred", nullable = false)
 	private int deferred;
 
-	private SyncRun(LocalDateTime startedAt) {
+	private SyncRun(SyncTrigger triggerType, LocalDateTime startedAt) {
+		this.triggerType = triggerType;
 		this.startedAt = startedAt;
 	}
 
-	/** 실행 시작 — 수집 결과를 받기 전 상태. */
-	public static SyncRun started(LocalDateTime startedAt) {
-		return new SyncRun(startedAt);
+	/** 실행 시작 — 수집 결과를 받기 전 상태. 계기(trigger)를 함께 남긴다. */
+	public static SyncRun started(SyncTrigger triggerType, LocalDateTime startedAt) {
+		return new SyncRun(triggerType, startedAt);
 	}
 
 	/** 수집 결과(원천이 말한 총 건수·절단 여부·수집 건수)를 기록한다. */
