@@ -10,11 +10,11 @@ import org.springframework.stereotype.Component;
 
 import lombok.RequiredArgsConstructor;
 import modi.backend.config.EnrichmentProperties;
-import modi.backend.domain.exhibition.CatalogDetailData;
-import modi.backend.domain.exhibition.EnrichmentJob;
-import modi.backend.domain.exhibition.ExhibitionCatalogClient;
-import modi.backend.domain.exhibition.JobFailureType;
-import modi.backend.domain.exhibition.JobType;
+import modi.backend.domain.exhibition.sync.CatalogDetailData;
+import modi.backend.domain.exhibition.enrichment.EnrichmentJob;
+import modi.backend.domain.exhibition.sync.ExhibitionCatalogClient;
+import modi.backend.domain.exhibition.enrichment.JobFailureType;
+import modi.backend.domain.exhibition.enrichment.JobType;
 
 /**
  * 상세(detail2) 재시도 처리기 — <b>현행 최대 갭의 해소</b>. 예전엔 상세 실패의 재시도 상태가

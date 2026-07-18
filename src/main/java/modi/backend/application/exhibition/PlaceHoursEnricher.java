@@ -10,9 +10,9 @@ import org.springframework.stereotype.Component;
 
 import lombok.RequiredArgsConstructor;
 import modi.backend.config.PlaceHoursProperties;
-import modi.backend.domain.exhibition.OpeningHoursFormatter;
-import modi.backend.domain.exhibition.PlaceHoursData;
-import modi.backend.domain.exhibition.PlaceHoursProvider;
+import modi.backend.domain.exhibition.hours.OpeningHoursFormatter;
+import modi.backend.domain.exhibition.hours.PlaceHoursData;
+import modi.backend.domain.exhibition.hours.PlaceHoursProvider;
 
 /**
  * 전시 영업시간(운영시간) 보강 오케스트레이션 — 장르 보강({@link CatalogEnricher})과 동형.

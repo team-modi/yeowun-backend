@@ -11,7 +11,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import modi.backend.TestcontainersConfiguration;
-import modi.backend.domain.exhibition.ExhibitionCatalogClient;
+import modi.backend.domain.exhibition.sync.ExhibitionCatalogClient;
 
 /**
  * 로컬 시드 적재기 검증(@SpringBootTest + Testcontainers-MySQL). 플래그 on + 빈 DB로 기동하면 부팅 시 classpath 시드 SQL이

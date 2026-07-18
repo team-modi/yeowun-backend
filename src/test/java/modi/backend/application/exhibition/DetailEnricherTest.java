@@ -16,12 +16,12 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import modi.backend.config.EnrichmentProperties;
-import modi.backend.domain.exhibition.CatalogDetailData;
-import modi.backend.domain.exhibition.EnrichmentJob;
-import modi.backend.domain.exhibition.ExhibitionCatalogClient;
-import modi.backend.domain.exhibition.ExhibitionErrorCode;
-import modi.backend.domain.exhibition.JobFailureType;
-import modi.backend.domain.exhibition.JobType;
+import modi.backend.domain.exhibition.sync.CatalogDetailData;
+import modi.backend.domain.exhibition.enrichment.EnrichmentJob;
+import modi.backend.domain.exhibition.sync.ExhibitionCatalogClient;
+import modi.backend.domain.exhibition.catalog.ExhibitionErrorCode;
+import modi.backend.domain.exhibition.enrichment.JobFailureType;
+import modi.backend.domain.exhibition.enrichment.JobType;
 import modi.backend.support.error.CoreException;
 
 /**

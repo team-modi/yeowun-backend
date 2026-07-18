@@ -16,22 +16,22 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import modi.backend.TestcontainersConfiguration;
-import modi.backend.domain.exhibition.CatalogDetailData;
-import modi.backend.domain.exhibition.CatalogExhibitionData;
-import modi.backend.domain.exhibition.CatalogListData;
-import modi.backend.domain.exhibition.CultureDetailResponse;
-import modi.backend.domain.exhibition.CultureDetailResponseRepository;
-import modi.backend.domain.exhibition.CultureListResponse;
-import modi.backend.domain.exhibition.EnrichmentJob;
-import modi.backend.domain.exhibition.EnrichmentJobRepository;
-import modi.backend.domain.exhibition.JobStatus;
-import modi.backend.domain.exhibition.JobType;
-import modi.backend.domain.exhibition.CultureListResponseRepository;
-import modi.backend.domain.exhibition.ExhibitionCatalogClient;
-import modi.backend.domain.exhibition.ExhibitionCategory;
-import modi.backend.domain.exhibition.ExhibitionErrorCode;
-import modi.backend.domain.exhibition.ExhibitionRegion;
-import modi.backend.domain.exhibition.ExhibitionRepository;
+import modi.backend.domain.exhibition.sync.CatalogDetailData;
+import modi.backend.domain.exhibition.sync.CatalogExhibitionData;
+import modi.backend.domain.exhibition.sync.CatalogListData;
+import modi.backend.domain.exhibition.sync.CultureDetailResponse;
+import modi.backend.domain.exhibition.sync.CultureDetailResponseRepository;
+import modi.backend.domain.exhibition.sync.CultureListResponse;
+import modi.backend.domain.exhibition.enrichment.EnrichmentJob;
+import modi.backend.domain.exhibition.enrichment.EnrichmentJobRepository;
+import modi.backend.domain.exhibition.enrichment.JobStatus;
+import modi.backend.domain.exhibition.enrichment.JobType;
+import modi.backend.domain.exhibition.sync.CultureListResponseRepository;
+import modi.backend.domain.exhibition.sync.ExhibitionCatalogClient;
+import modi.backend.domain.exhibition.catalog.ExhibitionCategory;
+import modi.backend.domain.exhibition.catalog.ExhibitionErrorCode;
+import modi.backend.domain.exhibition.catalog.ExhibitionRegion;
+import modi.backend.domain.exhibition.catalog.ExhibitionRepository;
 import modi.backend.support.error.CoreException;
 
 /**
@@ -57,7 +57,7 @@ class CultureVendorArchiveTest {
 	ExhibitionRepository exhibitionRepository;
 
 	@Autowired
-	modi.backend.domain.exhibition.ExhibitionDetailRepository exhibitionDetailRepository;
+	modi.backend.domain.exhibition.catalog.ExhibitionDetailRepository exhibitionDetailRepository;
 
 	@Autowired
 	CultureListResponseRepository cultureListResponseRepository;

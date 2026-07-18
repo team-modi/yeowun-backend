@@ -29,13 +29,13 @@ import org.springframework.test.web.servlet.MockMvc;
 import modi.backend.TestcontainersConfiguration;
 import modi.backend.application.exhibition.ExhibitionFacade;
 import modi.backend.domain.auth.TokenProvider;
-import modi.backend.domain.exhibition.CatalogExhibitionData;
-import modi.backend.domain.exhibition.CatalogListData;
-import modi.backend.domain.exhibition.Exhibition;
-import modi.backend.domain.exhibition.ExhibitionCatalogClient;
-import modi.backend.domain.exhibition.ExhibitionCategory;
-import modi.backend.domain.exhibition.ExhibitionRegion;
-import modi.backend.domain.exhibition.ExhibitionRepository;
+import modi.backend.domain.exhibition.sync.CatalogExhibitionData;
+import modi.backend.domain.exhibition.sync.CatalogListData;
+import modi.backend.domain.exhibition.catalog.Exhibition;
+import modi.backend.domain.exhibition.sync.ExhibitionCatalogClient;
+import modi.backend.domain.exhibition.catalog.ExhibitionCategory;
+import modi.backend.domain.exhibition.catalog.ExhibitionRegion;
+import modi.backend.domain.exhibition.catalog.ExhibitionRepository;
 import modi.backend.domain.user.User;
 import modi.backend.domain.user.UserRepository;
 import modi.backend.infra.record.RecordJpaRepository;
@@ -61,7 +61,7 @@ class RecordV1ControllerTest {
 	ExhibitionRepository exhibitionRepository;
 
 	@Autowired
-	modi.backend.domain.exhibition.ExhibitionPlaceRepository exhibitionPlaceRepository;
+	modi.backend.domain.exhibition.catalog.ExhibitionPlaceRepository exhibitionPlaceRepository;
 
 	@Autowired
 	ExhibitionFacade exhibitionFacade;
@@ -87,7 +87,7 @@ class RecordV1ControllerTest {
 		bearerUser1 = "Bearer " + tokenProvider.issue(u1, "kakao").accessToken();
 		bearerUser2 = "Bearer " + tokenProvider.issue(u2, "kakao").accessToken();
 
-		Long placeId = modi.backend.domain.exhibition.ExhibitionTestFactory.placeId(
+		Long placeId = modi.backend.domain.exhibition.catalog.ExhibitionTestFactory.placeId(
 				exhibitionPlaceRepository, "예술의전당", null);
 		Exhibition exhibition = exhibitionRepository.save(Exhibition.createCatalog(
 				"RECORD-TEST-" + System.nanoTime(), "모네전", placeId, null, null, null, null, null, "기관"));

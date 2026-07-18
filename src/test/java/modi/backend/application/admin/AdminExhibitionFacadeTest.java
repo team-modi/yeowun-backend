@@ -13,11 +13,11 @@ import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import modi.backend.domain.exhibition.ExhibitionDetail;
-import modi.backend.domain.exhibition.ExhibitionDetailRepository;
-import modi.backend.domain.exhibition.ExhibitionHistoryRepository;
-import modi.backend.domain.exhibition.ExhibitionPlaceRepository;
-import modi.backend.domain.exhibition.ExhibitionRepository;
+import modi.backend.domain.exhibition.catalog.ExhibitionDetail;
+import modi.backend.domain.exhibition.catalog.ExhibitionDetailRepository;
+import modi.backend.domain.exhibition.catalog.ExhibitionHistoryRepository;
+import modi.backend.domain.exhibition.catalog.ExhibitionPlaceRepository;
+import modi.backend.domain.exhibition.catalog.ExhibitionRepository;
 
 /**
  * AdminExhibitionFacade.reparseDescriptions 단위 검증 — 설명은 상세 satellite(exhibition_detail)로 이동했으므로 그 행을 대상으로,

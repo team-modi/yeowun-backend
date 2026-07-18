@@ -12,7 +12,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import modi.backend.TestcontainersConfiguration;
-import modi.backend.domain.exhibition.ExhibitionCatalogClient;
+import modi.backend.domain.exhibition.sync.ExhibitionCatalogClient;
 
 /**
  * 플래그 off(운영/테스트 기본)에서는 로컬 시더 빈이 아예 뜨지 않고, 시드도 적재되지 않음을 본다.

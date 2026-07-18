@@ -5,9 +5,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import modi.backend.domain.exhibition.GenreClassification;
-import modi.backend.domain.exhibition.GenreKeyword;
-import modi.backend.domain.exhibition.GenreProvider;
+import modi.backend.domain.exhibition.genre.GenreClassification;
+import modi.backend.domain.exhibition.genre.GenreKeyword;
+import modi.backend.domain.exhibition.genre.GenreProvider;
 
 class RandomGenreClassifierTest {
 

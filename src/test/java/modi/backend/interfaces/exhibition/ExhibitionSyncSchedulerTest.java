@@ -12,7 +12,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.InOrder;
 
-import modi.backend.domain.exhibition.ExhibitionErrorCode;
+import modi.backend.domain.exhibition.catalog.ExhibitionErrorCode;
 import modi.backend.support.error.CoreException;
 import modi.backend.application.exhibition.CatalogEnricher;
 import modi.backend.application.exhibition.ExhibitionFacade;

@@ -35,14 +35,14 @@ import com.jayway.jsonpath.JsonPath;
 import modi.backend.TestcontainersConfiguration;
 import modi.backend.application.exhibition.ExhibitionFacade;
 import modi.backend.domain.bookmark.ExhibitionBookmarkRepository;
-import modi.backend.domain.exhibition.CatalogDetailData;
-import modi.backend.domain.exhibition.CatalogExhibitionData;
-import modi.backend.domain.exhibition.CatalogListData;
-import modi.backend.domain.exhibition.Exhibition;
-import modi.backend.domain.exhibition.ExhibitionCatalogClient;
-import modi.backend.domain.exhibition.ExhibitionCategory;
-import modi.backend.domain.exhibition.ExhibitionRegion;
-import modi.backend.domain.exhibition.ExhibitionRepository;
+import modi.backend.domain.exhibition.sync.CatalogDetailData;
+import modi.backend.domain.exhibition.sync.CatalogExhibitionData;
+import modi.backend.domain.exhibition.sync.CatalogListData;
+import modi.backend.domain.exhibition.catalog.Exhibition;
+import modi.backend.domain.exhibition.sync.ExhibitionCatalogClient;
+import modi.backend.domain.exhibition.catalog.ExhibitionCategory;
+import modi.backend.domain.exhibition.catalog.ExhibitionRegion;
+import modi.backend.domain.exhibition.catalog.ExhibitionRepository;
 import modi.backend.infra.auth.KakaoApi;
 
 /**
@@ -71,10 +71,10 @@ class ExhibitionIntegrationTest {
 	ExhibitionRepository exhibitionRepository;
 
 	@Autowired
-	modi.backend.domain.exhibition.ExhibitionPlaceRepository exhibitionPlaceRepository;
+	modi.backend.domain.exhibition.catalog.ExhibitionPlaceRepository exhibitionPlaceRepository;
 
 	@Autowired
-	modi.backend.domain.exhibition.ExhibitionDetailRepository exhibitionDetailRepository;
+	modi.backend.domain.exhibition.catalog.ExhibitionDetailRepository exhibitionDetailRepository;
 
 	@Autowired
 	ExhibitionBookmarkRepository exhibitionBookmarkRepository;
@@ -122,12 +122,12 @@ class ExhibitionIntegrationTest {
 			ExhibitionRegion region, ExhibitionCategory category, String price, Double gpsX, Double gpsY) {
 		// 전시장은 전시마다 고유(region·gps 필터·거리순이 전시별로 갈리게) — 자연키 이름을 externalId로 유일하게.
 		Long placeId = exhibitionPlaceRepository.save(
-				modi.backend.domain.exhibition.ExhibitionPlace.createFromList(title + "@" + externalId, region, null,
+				modi.backend.domain.exhibition.catalog.ExhibitionPlace.createFromList(title + "@" + externalId, region, null,
 						gpsX, gpsY)).getId();
 		Exhibition e = exhibitionRepository.save(
 				Exhibition.createCatalog(externalId, title, placeId, startDate, endDate, category, null, null, "기관"));
 		if (price != null && !price.isBlank()) {
-			exhibitionDetailRepository.save(modi.backend.domain.exhibition.ExhibitionDetail.create(
+			exhibitionDetailRepository.save(modi.backend.domain.exhibition.catalog.ExhibitionDetail.create(
 					e.getId(), price, null, null, java.time.LocalDateTime.now()));
 		}
 		return e.getId();

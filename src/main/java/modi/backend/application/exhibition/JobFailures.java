@@ -2,12 +2,12 @@ package modi.backend.application.exhibition;
 
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
-import modi.backend.domain.exhibition.JobFailureType;
+import modi.backend.domain.exhibition.enrichment.JobFailureType;
 
 /**
  * 외부 호출 예외를 재시도 분류({@link JobFailureType})로 옮기는 규칙 — <b>애플리케이션 계층</b>의 몫이다.
  *
- * <p>도메인({@link modi.backend.domain.exhibition.EnrichmentJob})은 Spring/HTTP를 몰라야 하므로 예외 타입을 알 수
+ * <p>도메인({@link modi.backend.domain.exhibition.enrichment.EnrichmentJob})은 Spring/HTTP를 몰라야 하므로 예외 타입을 알 수
  * 없다. 그래서 "어떤 예외가 재시도 가능한가"는 여기서 판정하고, 결과 <b>값</b>만 도메인으로 넘긴다.
  *
  * <ul>

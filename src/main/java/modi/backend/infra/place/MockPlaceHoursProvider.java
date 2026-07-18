@@ -6,10 +6,10 @@ import java.util.Optional;
 
 import org.springframework.stereotype.Component;
 
-import modi.backend.domain.exhibition.PlaceHoursData;
-import modi.backend.domain.exhibition.PlaceHoursProvider;
-import modi.backend.domain.exhibition.PlaceHoursVendor;
-import modi.backend.domain.exhibition.WeeklyOpeningHours;
+import modi.backend.domain.exhibition.hours.PlaceHoursData;
+import modi.backend.domain.exhibition.hours.PlaceHoursProvider;
+import modi.backend.domain.exhibition.hours.PlaceHoursVendor;
+import modi.backend.domain.exhibition.hours.WeeklyOpeningHours;
 
 /**
  * 외부 호출 없는 mock 영업시간 조회기(기본 provider). 로컬·CI·develop에서 유료 구글 호출을 <b>0</b>으로 막고,

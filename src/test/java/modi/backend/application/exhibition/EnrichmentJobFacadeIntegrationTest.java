@@ -13,17 +13,17 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 
 import modi.backend.TestcontainersConfiguration;
-import modi.backend.domain.exhibition.EnrichmentJob;
-import modi.backend.domain.exhibition.EnrichmentJobRepository;
-import modi.backend.domain.exhibition.ExhibitionPlace;
-import modi.backend.domain.exhibition.ExhibitionPlaceRepository;
-import modi.backend.domain.exhibition.JobFailureType;
-import modi.backend.domain.exhibition.JobStatus;
-import modi.backend.domain.exhibition.JobType;
-import modi.backend.domain.exhibition.PlaceHours;
-import modi.backend.domain.exhibition.PlaceHoursRepository;
-import modi.backend.domain.exhibition.PlaceHoursStatus;
-import modi.backend.domain.exhibition.PlaceHoursVendor;
+import modi.backend.domain.exhibition.enrichment.EnrichmentJob;
+import modi.backend.domain.exhibition.enrichment.EnrichmentJobRepository;
+import modi.backend.domain.exhibition.catalog.ExhibitionPlace;
+import modi.backend.domain.exhibition.catalog.ExhibitionPlaceRepository;
+import modi.backend.domain.exhibition.enrichment.JobFailureType;
+import modi.backend.domain.exhibition.enrichment.JobStatus;
+import modi.backend.domain.exhibition.enrichment.JobType;
+import modi.backend.domain.exhibition.hours.PlaceHours;
+import modi.backend.domain.exhibition.hours.PlaceHoursRepository;
+import modi.backend.domain.exhibition.hours.PlaceHoursStatus;
+import modi.backend.domain.exhibition.hours.PlaceHoursVendor;
 
 /**
  * 통합 작업큐 파사드·저장소 통합 검증(@SpringBootTest + Testcontainers-MySQL) — enqueue 멱등(UK), 선별 쿼리(findDue),

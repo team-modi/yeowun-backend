@@ -12,8 +12,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.DefaultApplicationArguments;
 
-import modi.backend.domain.exhibition.ExhibitionErrorCode;
-import modi.backend.domain.exhibition.SyncTrigger;
+import modi.backend.domain.exhibition.catalog.ExhibitionErrorCode;
+import modi.backend.domain.exhibition.sync.SyncTrigger;
 import modi.backend.support.error.CoreException;
 
 /**

@@ -23,13 +23,13 @@ import org.junit.jupiter.api.Test;
 
 import modi.backend.config.CatalogEnrichProperties;
 import modi.backend.config.GenreProperties;
-import modi.backend.domain.exhibition.EnrichmentJob;
-import modi.backend.domain.exhibition.GenreClassification;
-import modi.backend.domain.exhibition.GenreClassifier;
-import modi.backend.domain.exhibition.GenreProvider;
-import modi.backend.domain.exhibition.GenreResult;
-import modi.backend.domain.exhibition.JobFailureType;
-import modi.backend.domain.exhibition.JobType;
+import modi.backend.domain.exhibition.enrichment.EnrichmentJob;
+import modi.backend.domain.exhibition.genre.GenreClassification;
+import modi.backend.domain.exhibition.genre.GenreClassifier;
+import modi.backend.domain.exhibition.genre.GenreProvider;
+import modi.backend.domain.exhibition.genre.GenreResult;
+import modi.backend.domain.exhibition.enrichment.JobFailureType;
+import modi.backend.domain.exhibition.enrichment.JobType;
 
 /**
  * CatalogEnricher 단위 검증 — <b>통합 작업큐 기반</b> 장르 보강(스윕 → 드레인). 핵심은 "AI 최소 1회 무조건":

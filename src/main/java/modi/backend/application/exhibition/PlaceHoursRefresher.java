@@ -10,11 +10,11 @@ import org.springframework.stereotype.Component;
 
 import lombok.RequiredArgsConstructor;
 import modi.backend.config.EnrichmentProperties;
-import modi.backend.domain.exhibition.EnrichmentJob;
-import modi.backend.domain.exhibition.JobType;
-import modi.backend.domain.exhibition.OpeningHoursFormatter;
-import modi.backend.domain.exhibition.PlaceHoursData;
-import modi.backend.domain.exhibition.PlaceHoursProvider;
+import modi.backend.domain.exhibition.enrichment.EnrichmentJob;
+import modi.backend.domain.exhibition.enrichment.JobType;
+import modi.backend.domain.exhibition.hours.OpeningHoursFormatter;
+import modi.backend.domain.exhibition.hours.PlaceHoursData;
+import modi.backend.domain.exhibition.hours.PlaceHoursProvider;
 
 /**
  * 이벤트 구동 영업시간 재검증 처리기(설계 §4-1) — 통합 작업큐의 영업시간 작업

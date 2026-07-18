@@ -11,14 +11,14 @@ import org.springframework.stereotype.Component;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import modi.backend.config.PlaceHoursProperties;
-import modi.backend.domain.exhibition.ExternalApi;
-import modi.backend.domain.exhibition.ExternalApiCall;
-import modi.backend.domain.exhibition.ExternalApiCallRepository;
-import modi.backend.domain.exhibition.ExternalApiOutcome;
-import modi.backend.domain.exhibition.PlaceHoursData;
-import modi.backend.domain.exhibition.PlaceHoursProvider;
-import modi.backend.domain.exhibition.PlaceHoursVendor;
-import modi.backend.domain.exhibition.WeeklyOpeningHours;
+import modi.backend.domain.exhibition.sync.ExternalApi;
+import modi.backend.domain.exhibition.sync.ExternalApiCall;
+import modi.backend.domain.exhibition.sync.ExternalApiCallRepository;
+import modi.backend.domain.exhibition.sync.ExternalApiOutcome;
+import modi.backend.domain.exhibition.hours.PlaceHoursData;
+import modi.backend.domain.exhibition.hours.PlaceHoursProvider;
+import modi.backend.domain.exhibition.hours.PlaceHoursVendor;
+import modi.backend.domain.exhibition.hours.WeeklyOpeningHours;
 
 /**
  * 구글 Places(New) 실호출 영업시간 조회기. 장소명+주소로 Text Search 1콜을 보내 {@code regularOpeningHours}를 받고,
@@ -83,7 +83,7 @@ public class GooglePlaceHoursProvider implements PlaceHoursProvider {
 	private void record(String placeAddr, ExternalApiOutcome outcome, java.time.LocalDateTime calledAt) {
 		try {
 			externalApiCallRepository.save(ExternalApiCall.billable(ExternalApi.GOOGLE,
-					modi.backend.domain.exhibition.PlaceKey.of(placeAddr), outcome, calledAt));
+					modi.backend.domain.exhibition.hours.PlaceKey.of(placeAddr), outcome, calledAt));
 		} catch (RuntimeException e) {
 			log.warn("구글 호출 감사 기록 실패(무시): {}", e.getMessage());
 		}

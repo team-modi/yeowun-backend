@@ -13,19 +13,19 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDateTime;
 
 import lombok.RequiredArgsConstructor;
-import modi.backend.domain.exhibition.Exhibition;
-import modi.backend.domain.exhibition.ExhibitionCategory;
-import modi.backend.domain.exhibition.ExhibitionDetail;
-import modi.backend.domain.exhibition.ExhibitionDetailRepository;
-import modi.backend.domain.exhibition.ExhibitionPlace;
-import modi.backend.domain.exhibition.ExhibitionPlaceRepository;
-import modi.backend.domain.exhibition.ExhibitionQuery;
-import modi.backend.domain.exhibition.ExhibitionRegion;
-import modi.backend.domain.exhibition.ExhibitionRepository;
-import modi.backend.domain.exhibition.PlaceHours;
-import modi.backend.domain.exhibition.PlaceHoursRepository;
-import modi.backend.domain.exhibition.PlaceHoursStatus;
-import modi.backend.domain.exhibition.PlaceHoursVendor;
+import modi.backend.domain.exhibition.catalog.Exhibition;
+import modi.backend.domain.exhibition.catalog.ExhibitionCategory;
+import modi.backend.domain.exhibition.catalog.ExhibitionDetail;
+import modi.backend.domain.exhibition.catalog.ExhibitionDetailRepository;
+import modi.backend.domain.exhibition.catalog.ExhibitionPlace;
+import modi.backend.domain.exhibition.catalog.ExhibitionPlaceRepository;
+import modi.backend.domain.exhibition.catalog.ExhibitionQuery;
+import modi.backend.domain.exhibition.catalog.ExhibitionRegion;
+import modi.backend.domain.exhibition.catalog.ExhibitionRepository;
+import modi.backend.domain.exhibition.hours.PlaceHours;
+import modi.backend.domain.exhibition.hours.PlaceHoursRepository;
+import modi.backend.domain.exhibition.hours.PlaceHoursStatus;
+import modi.backend.domain.exhibition.hours.PlaceHoursVendor;
 import modi.backend.support.time.AppTime;
 
 /**
@@ -116,7 +116,7 @@ public class ExhibitionDemoSeeder implements ApplicationRunner {
 		rows.forEach(r -> {
 			// 전시장 resolve-or-create(정규화 이름) — 데모라 신설 위주지만 같은 이름은 하나로 수렴한다.
 			ExhibitionPlace place = exhibitionPlaceRepository.findByPlaceKey(
-					modi.backend.domain.exhibition.PlaceKey.of(r.place()))
+					modi.backend.domain.exhibition.hours.PlaceKey.of(r.place()))
 					.orElseGet(() -> exhibitionPlaceRepository.save(ExhibitionPlace.createFromList(
 							r.place(), r.region(), r.sigungu(), r.gpsX(), r.gpsY())));
 			place.enrichDetail(null, null, r.detailUrl());

@@ -9,14 +9,14 @@ import org.springframework.transaction.annotation.Transactional;
 
 import lombok.RequiredArgsConstructor;
 import modi.backend.config.EnrichmentProperties;
-import modi.backend.domain.exhibition.EnrichmentJob;
-import modi.backend.domain.exhibition.EnrichmentJobRepository;
-import modi.backend.domain.exhibition.ExhibitionPlace;
-import modi.backend.domain.exhibition.ExhibitionPlaceRepository;
-import modi.backend.domain.exhibition.JobFailureType;
-import modi.backend.domain.exhibition.JobType;
-import modi.backend.domain.exhibition.PlaceHours;
-import modi.backend.domain.exhibition.PlaceHoursRepository;
+import modi.backend.domain.exhibition.enrichment.EnrichmentJob;
+import modi.backend.domain.exhibition.enrichment.EnrichmentJobRepository;
+import modi.backend.domain.exhibition.catalog.ExhibitionPlace;
+import modi.backend.domain.exhibition.catalog.ExhibitionPlaceRepository;
+import modi.backend.domain.exhibition.enrichment.JobFailureType;
+import modi.backend.domain.exhibition.enrichment.JobType;
+import modi.backend.domain.exhibition.hours.PlaceHours;
+import modi.backend.domain.exhibition.hours.PlaceHoursRepository;
 
 /**
  * 통합 보강 작업큐 유스케이스 조율 — enqueue(멱등)·선별·상태 전이만 맡는다. 실제 외부 작업(상세 조회·AI 분류·

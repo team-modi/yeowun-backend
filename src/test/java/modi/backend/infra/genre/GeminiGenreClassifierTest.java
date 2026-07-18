@@ -15,10 +15,10 @@ import org.springframework.web.service.invoker.HttpServiceProxyFactory;
 
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import modi.backend.config.GeminiProperties;
-import modi.backend.domain.exhibition.GenreClassification;
-import modi.backend.domain.exhibition.GenreKeyword;
-import modi.backend.domain.exhibition.GenreProvider;
-import modi.backend.domain.exhibition.GenreResult;
+import modi.backend.domain.exhibition.genre.GenreClassification;
+import modi.backend.domain.exhibition.genre.GenreKeyword;
+import modi.backend.domain.exhibition.genre.GenreProvider;
+import modi.backend.domain.exhibition.genre.GenreResult;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;

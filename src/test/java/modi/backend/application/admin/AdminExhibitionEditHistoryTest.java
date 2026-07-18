@@ -14,13 +14,13 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import modi.backend.TestcontainersConfiguration;
-import modi.backend.domain.exhibition.Exhibition;
-import modi.backend.domain.exhibition.ExhibitionCatalogClient;
-import modi.backend.domain.exhibition.ExhibitionCategory;
-import modi.backend.domain.exhibition.ExhibitionHistory;
-import modi.backend.domain.exhibition.ExhibitionHistoryRepository;
-import modi.backend.domain.exhibition.ExhibitionRegion;
-import modi.backend.domain.exhibition.ExhibitionRepository;
+import modi.backend.domain.exhibition.catalog.Exhibition;
+import modi.backend.domain.exhibition.sync.ExhibitionCatalogClient;
+import modi.backend.domain.exhibition.catalog.ExhibitionCategory;
+import modi.backend.domain.exhibition.catalog.ExhibitionHistory;
+import modi.backend.domain.exhibition.catalog.ExhibitionHistoryRepository;
+import modi.backend.domain.exhibition.catalog.ExhibitionRegion;
+import modi.backend.domain.exhibition.catalog.ExhibitionRepository;
 import modi.backend.support.error.CoreException;
 
 /**
@@ -43,10 +43,10 @@ class AdminExhibitionEditHistoryTest {
 	ExhibitionRepository exhibitionRepository;
 
 	@Autowired
-	modi.backend.domain.exhibition.ExhibitionPlaceRepository exhibitionPlaceRepository;
+	modi.backend.domain.exhibition.catalog.ExhibitionPlaceRepository exhibitionPlaceRepository;
 
 	@Autowired
-	modi.backend.domain.exhibition.ExhibitionDetailRepository exhibitionDetailRepository;
+	modi.backend.domain.exhibition.catalog.ExhibitionDetailRepository exhibitionDetailRepository;
 
 	@Autowired
 	ExhibitionHistoryRepository exhibitionHistoryRepository;
@@ -119,11 +119,11 @@ class AdminExhibitionEditHistoryTest {
 
 	private Exhibition seed(String title, String place, String price, String description) {
 		// resolve-or-create — 같은 이름을 여러 테스트가 seed해도 자연키(정규화 이름) UK를 위반하지 않게.
-		Long placeId = modi.backend.domain.exhibition.ExhibitionTestFactory.placeId(
+		Long placeId = modi.backend.domain.exhibition.catalog.ExhibitionTestFactory.placeId(
 				exhibitionPlaceRepository, place, ExhibitionRegion.SEOUL);
 		Exhibition e = exhibitionRepository.save(Exhibition.createCatalog("EDIT-" + SEQ.getAndIncrement(), title,
 				placeId, null, null, ExhibitionCategory.PAINTING, null, null, "기관"));
-		exhibitionDetailRepository.save(modi.backend.domain.exhibition.ExhibitionDetail.create(
+		exhibitionDetailRepository.save(modi.backend.domain.exhibition.catalog.ExhibitionDetail.create(
 				e.getId(), price, description, null, java.time.LocalDateTime.now()));
 		return e;
 	}

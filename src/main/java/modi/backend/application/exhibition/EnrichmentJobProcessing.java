@@ -4,8 +4,8 @@ import java.time.LocalDateTime;
 
 import org.springframework.dao.OptimisticLockingFailureException;
 
-import modi.backend.domain.exhibition.EnrichmentJob;
-import modi.backend.domain.exhibition.JobFailureType;
+import modi.backend.domain.exhibition.enrichment.EnrichmentJob;
+import modi.backend.domain.exhibition.enrichment.JobFailureType;
 
 /**
  * 작업 상태 전이의 <b>낙관락 skip 규약</b>을 처리기들이 공유하는 지점.
