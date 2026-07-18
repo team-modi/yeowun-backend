@@ -1,5 +1,7 @@
 package modi.backend.infra.exhibition.sync.culture;
 
+import static modi.backend.domain.exhibition.catalog.ExhibitionErrorCode.*;
+
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 
@@ -29,28 +31,23 @@ import modi.backend.support.text.HtmlTextExtractor;
 public class CultureApiMapper {
 
 	private static final Logger log = LoggerFactory.getLogger(CultureApiMapper.class);
-
 	private static final DateTimeFormatter YYYYMMDD = DateTimeFormatter.ofPattern("yyyyMMdd");
 	private static final XmlMapper xmlMapper = new XmlMapper();
-
-	/**
-	 * 벤더층 payload 직렬화기. 원천이 실제로 준 필드만 남기도록 null을 제외한다 — 이 원천은 결측이 잦아
-	 * (목록 응답엔 상세 8필드가 항상 null) 전부 실으면 "안 준 것"과 "빈 값"이 뒤섞이고 payload만 비대해진다.
-	 */
 	private static final ObjectMapper jsonMapper = new ObjectMapper()
 			.setSerializationInclusion(JsonInclude.Include.NON_NULL);
 
-	/** XML을 파싱하고, 파싱 실패·비정상 응답(resultCode != 00)이면 {@link ExhibitionErrorCode#EXTERNAL_API_UNAVAILABLE}. */
 	public CultureApiResponse parse(String xml) {
 		CultureApiResponse body;
 		try {
 			body = xmlMapper.readValue(xml, CultureApiResponse.class);
 		} catch (Exception e) {
-			throw new CoreException(ExhibitionErrorCode.EXTERNAL_API_UNAVAILABLE, "외부 전시 API 응답 파싱 실패", e);
+			throw new CoreException(EXTERNAL_API_UNAVAILABLE, "외부 전시 API 응답 파싱 실패", e);
 		}
 		if (!body.isSuccess()) {
-			throw new CoreException(ExhibitionErrorCode.EXTERNAL_API_UNAVAILABLE,
-					"외부 전시 API 비정상: " + (body.header() == null ? "null" : body.header().resultCode()));
+			// 표준 코드를 사람이 읽는 라벨로 남긴다 — 운영 로그에서 "왜 실패했나"(한도초과 vs 키오류)를 코드 암기 없이 판독.
+			String resultCode = body.header() == null ? null : body.header().resultCode();
+			throw new CoreException(EXTERNAL_API_UNAVAILABLE,
+					"외부 전시 API 비정상: " + CultureResultCode.describe(resultCode));
 		}
 		return body;
 	}
