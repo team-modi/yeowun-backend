@@ -47,9 +47,9 @@ import modi.backend.infra.exhibition.sync.CultureListResponseJpaRepository;
  */
 @Service
 @RequiredArgsConstructor
-public class ExhibitionIngestFacade {
+public class ExhibitionSyncFacade {
 
-	private static final Logger log = LoggerFactory.getLogger(ExhibitionIngestFacade.class);
+	private static final Logger log = LoggerFactory.getLogger(ExhibitionSyncFacade.class);
 
 	/** 전시 애그리거트 루트 — 코어 쓰기와 부속(상세·장르) upsert의 단일 진입점. */
 	private final ExhibitionRepository exhibitionRepository;

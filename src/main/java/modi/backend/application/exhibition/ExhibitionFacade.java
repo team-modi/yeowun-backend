@@ -50,7 +50,7 @@ import modi.backend.support.time.AppTime;
 
 /**
  * 전시 사용자 유스케이스 조율(03_전시.md) — 목록/탐색·배너·상세·개인 전시 등록/삭제. load·조율·save만 하고,
- * 상태 변경·규칙 판단은 도메인 엔티티에 위임한다. 수집·보강 파이프라인은 {@code ingest.ExhibitionIngestFacade}가
+ * 상태 변경·규칙 판단은 도메인 엔티티에 위임한다. 수집·보강 파이프라인은 {@code sync.ExhibitionSyncFacade}가
  * 따로 담당한다(조회 API와 배치의 결합 해소).
  *
  * <p>장소는 {@link ExhibitionPlace}(N:1, resolve-or-create), 상세는 satellite(1:1), 작가는 조인(N:M) —
@@ -314,7 +314,7 @@ public class ExhibitionFacade {
 
 	/**
 	 * 상세 지연 수집의 반영 — 상세 satellite upsert(전시 애그리거트) + 전시장 보강 필드(주소/전화/홈페이지) 채움.
-	 * {@code ingest.ExhibitionIngestFacade}의 동기화 경로와 같은 두-애그리거트 조율이지만, 여기서는 사용자 최초 상세
+	 * {@code sync.ExhibitionSyncFacade}의 동기화 경로와 같은 두-애그리거트 조율이지만, 여기서는 사용자 최초 상세
 	 * 진입 1회의 캐시 채움이라 별도로 둔다(서빙↔파이프라인 파사드 간 의존을 만들지 않는다).
 	 */
 	private void applyCatalogDetail(Exhibition exhibition, CatalogDetailData d, LocalDateTime now) {

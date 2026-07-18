@@ -1,7 +1,7 @@
 package modi.backend.application.exhibition;
 
 import modi.backend.application.exhibition.sync.GenreTarget;
-import modi.backend.application.exhibition.sync.ExhibitionIngestFacade;
+import modi.backend.application.exhibition.sync.ExhibitionSyncFacade;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -47,7 +47,7 @@ class ExhibitionGenreWriteTest {
 	ExhibitionFacade exhibitionFacade;
 
 	@Autowired
-	ExhibitionIngestFacade exhibitionIngestFacade;
+	ExhibitionSyncFacade exhibitionSyncFacade;
 
 	@Autowired
 	ExhibitionRepository exhibitionRepository;
@@ -92,7 +92,7 @@ class ExhibitionGenreWriteTest {
 		Exhibition seeded = seedCatalog();
 		List<GenreTarget> targets = List.of(new GenreTarget(seeded.getId(), GenreClassification.from(seeded)));
 
-		int applied = exhibitionIngestFacade.applyGenres(targets,
+		int applied = exhibitionSyncFacade.applyGenres(targets,
 				List.of(GenreResult.ai("미디어아트", GenreProvider.GEMINI, "gemini-2.5-flash-002")),
 				LocalDateTime.now());
 
@@ -109,9 +109,9 @@ class ExhibitionGenreWriteTest {
 	void applyGenres_재분류_행추가없이_갱신() {
 		Exhibition seeded = seedCatalog();
 		List<GenreTarget> targets = List.of(new GenreTarget(seeded.getId(), GenreClassification.from(seeded)));
-		exhibitionIngestFacade.applyGenres(targets, List.of(GenreResult.random("회화·드로잉")), LocalDateTime.now());
+		exhibitionSyncFacade.applyGenres(targets, List.of(GenreResult.random("회화·드로잉")), LocalDateTime.now());
 
-		exhibitionIngestFacade.applyGenres(targets,
+		exhibitionSyncFacade.applyGenres(targets,
 				List.of(GenreResult.ai("사진", GenreProvider.GEMINI, "gemini-2.5-flash")), LocalDateTime.now());
 
 		assertThat(exhibitionGenreRepository.findAllByExhibitionIdIn(List.of(seeded.getId()))).hasSize(1);
@@ -129,7 +129,7 @@ class ExhibitionGenreWriteTest {
 		seeded.delete();
 		exhibitionRepository.save(seeded);
 
-		int applied = exhibitionIngestFacade.applyGenres(targets, List.of(GenreResult.random("사진")), LocalDateTime.now());
+		int applied = exhibitionSyncFacade.applyGenres(targets, List.of(GenreResult.random("사진")), LocalDateTime.now());
 
 		assertThat(applied).isZero();
 		assertThat(exhibitionGenreRepository.findByExhibitionId(seeded.getId())).isEmpty();

@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
 
 import lombok.RequiredArgsConstructor;
 import modi.backend.application.exhibition.sync.CatalogEnricher;
-import modi.backend.application.exhibition.sync.ExhibitionIngestFacade;
+import modi.backend.application.exhibition.sync.ExhibitionSyncFacade;
 import modi.backend.application.exhibition.sync.PlaceHoursEnricher;
 
 /**
@@ -30,7 +30,7 @@ public class ExhibitionSyncScheduler {
 
 	private static final Logger log = LoggerFactory.getLogger(ExhibitionSyncScheduler.class);
 
-	private final ExhibitionIngestFacade exhibitionIngestFacade;
+	private final ExhibitionSyncFacade exhibitionSyncFacade;
 	private final CatalogEnricher catalogEnricher;
 	private final PlaceHoursEnricher placeHoursEnricher;
 
@@ -46,7 +46,7 @@ public class ExhibitionSyncScheduler {
 			return;
 		}
 		try {
-			log.info("전시 정기 동기화 신규 {}건", exhibitionIngestFacade.syncCatalog());
+			log.info("전시 정기 동기화 신규 {}건", exhibitionSyncFacade.syncCatalog());
 			catalogEnricher.enrichGenres();
 		} catch (RuntimeException e) {
 			log.warn("전시 정기 동기화/보강 실패(다음 주기 재시도): {}", e.getMessage());

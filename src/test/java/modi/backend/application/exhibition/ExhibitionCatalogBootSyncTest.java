@@ -2,7 +2,7 @@ package modi.backend.application.exhibition;
 
 import modi.backend.application.exhibition.sync.CatalogEnricher;
 import modi.backend.application.exhibition.sync.ExhibitionCatalogBootSync;
-import modi.backend.application.exhibition.sync.ExhibitionIngestFacade;
+import modi.backend.application.exhibition.sync.ExhibitionSyncFacade;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.BDDMockito.given;
@@ -26,37 +26,37 @@ import modi.backend.support.error.CoreException;
  */
 class ExhibitionCatalogBootSyncTest {
 
-	private ExhibitionIngestFacade exhibitionIngestFacade;
+	private ExhibitionSyncFacade exhibitionSyncFacade;
 	private CatalogEnricher catalogEnricher;
 	private ExhibitionCatalogBootSync bootSync;
 
 	@BeforeEach
 	void setUp() {
-		exhibitionIngestFacade = mock(ExhibitionIngestFacade.class);
+		exhibitionSyncFacade = mock(ExhibitionSyncFacade.class);
 		catalogEnricher = mock(CatalogEnricher.class);
-		bootSync = new ExhibitionCatalogBootSync(exhibitionIngestFacade, catalogEnricher);
+		bootSync = new ExhibitionCatalogBootSync(exhibitionSyncFacade, catalogEnricher);
 	}
 
 	@Test
 	@DisplayName("run: 동기화(목록+상세)와 장르 분류를 별도 데몬 스레드에서 순서대로 수행한다(cold start 방지·readiness 비차단)")
 	void run_동기화후_장르트리거() {
-		given(exhibitionIngestFacade.syncCatalog(SyncTrigger.BOOT)).willReturn(2);
+		given(exhibitionSyncFacade.syncCatalog(SyncTrigger.BOOT)).willReturn(2);
 
 		bootSync.run(new DefaultApplicationArguments());
 
 		// 동기화·장르 분류 모두 데몬 스레드에서 수행 — 비동기라 timeout으로 대기 검증.
-		verify(exhibitionIngestFacade, timeout(2000).times(1)).syncCatalog(SyncTrigger.BOOT);
+		verify(exhibitionSyncFacade, timeout(2000).times(1)).syncCatalog(SyncTrigger.BOOT);
 		verify(catalogEnricher, timeout(2000).times(1)).enrichGenres();
 	}
 
 	@Test
 	@DisplayName("run: 동기화가 예외를 던져도 삼켜서 부팅을 막지 않는다")
 	void run_예외삼킴() {
-		given(exhibitionIngestFacade.syncCatalog(SyncTrigger.BOOT))
+		given(exhibitionSyncFacade.syncCatalog(SyncTrigger.BOOT))
 				.willThrow(new CoreException(ExhibitionErrorCode.EXTERNAL_API_UNAVAILABLE, "외부 전시 API 호출 실패"));
 
 		assertThatCode(() -> bootSync.run(new DefaultApplicationArguments())).doesNotThrowAnyException();
 
-		verify(exhibitionIngestFacade, timeout(2000).times(1)).syncCatalog(SyncTrigger.BOOT);
+		verify(exhibitionSyncFacade, timeout(2000).times(1)).syncCatalog(SyncTrigger.BOOT);
 	}
 }

@@ -38,7 +38,7 @@ public class CatalogEnricher {
 
 	private static final Logger log = LoggerFactory.getLogger(CatalogEnricher.class);
 
-	private final ExhibitionIngestFacade exhibitionIngestFacade;
+	private final ExhibitionSyncFacade exhibitionSyncFacade;
 	private final EnrichmentJobFacade enrichmentJobFacade;
 	private final CatalogEnrichProperties properties;
 	private final GenreProperties genreProperties;
@@ -70,7 +70,7 @@ public class CatalogEnricher {
 	/** 미분류 CATALOG를 GENRE_CLASSIFY로 멱등 enqueue한다(이번 실행이 드레인할 수 있는 만큼만 — 나머진 다음 실행이 스윕). */
 	private void sweepUnclassified(LocalDateTime now) {
 		int sweepLimit = properties.genreBatchSize() * properties.genreMaxBatchesPerRun();
-		List<String> externalIds = exhibitionIngestFacade.findUnclassifiedCatalogExternalIds(sweepLimit);
+		List<String> externalIds = exhibitionSyncFacade.findUnclassifiedCatalogExternalIds(sweepLimit);
 		if (!externalIds.isEmpty()) {
 			enrichmentJobFacade.enqueueAll(JobType.GENRE_CLASSIFY, externalIds, now);
 		}
@@ -89,7 +89,7 @@ public class CatalogEnricher {
 			return 0;
 		}
 		List<String> externalIds = jobs.stream().map(EnrichmentJob::getTargetKey).toList();
-		Map<String, GenreClassification> inputs = exhibitionIngestFacade.resolveGenreInputs(externalIds);
+		Map<String, GenreClassification> inputs = exhibitionSyncFacade.resolveGenreInputs(externalIds);
 
 		List<EnrichmentJob> actionable = new ArrayList<>();
 		List<GenreClassification> inputList = new ArrayList<>();
@@ -126,7 +126,7 @@ public class CatalogEnricher {
 			}
 		}
 
-		exhibitionIngestFacade.applyGenreResults(toWrite, now); // 성공분만 정준층에 쓴다(폴백값은 저장하지 않음)
+		exhibitionSyncFacade.applyGenreResults(toWrite, now); // 성공분만 정준층에 쓴다(폴백값은 저장하지 않음)
 		for (EnrichmentJob job : succeededJobs) {
 			if (EnrichmentJobProcessing.succeed(enrichmentJobFacade, job, now)) {
 				transitioned++;

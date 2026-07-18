@@ -32,7 +32,7 @@ public class DetailEnricher {
 	private static final Logger log = LoggerFactory.getLogger(DetailEnricher.class);
 
 	private final EnrichmentJobFacade enrichmentJobFacade;
-	private final ExhibitionIngestFacade exhibitionIngestFacade;
+	private final ExhibitionSyncFacade exhibitionSyncFacade;
 	private final ExhibitionCatalogClient catalogClient;
 	private final EnrichmentProperties properties;
 
@@ -59,7 +59,7 @@ public class DetailEnricher {
 	/** @return true면 전이함(성공/실패 기록), false면 낙관락 충돌로 skip(다른 워커가 처리). */
 	private boolean processOne(EnrichmentJob job, LocalDateTime now) {
 		String externalId = job.getTargetKey();
-		DetailTargetState state = exhibitionIngestFacade.findDetailTargetState(externalId);
+		DetailTargetState state = exhibitionSyncFacade.findDetailTargetState(externalId);
 		if (state == DetailTargetState.ALREADY_SYNCED) {
 			// 다른 경로(정기 sync)가 이미 상세를 채웠다 — 할 일 없음.
 			return EnrichmentJobProcessing.succeed(enrichmentJobFacade, job, now);
@@ -77,8 +77,8 @@ public class DetailEnricher {
 					JobFailures.classify(e), JobFailures.describe(e), now);
 		}
 		try {
-			detail.ifPresentOrElse(d -> exhibitionIngestFacade.applyDetailForJob(externalId, d),
-					() -> exhibitionIngestFacade.markDetailCheckedForJob(externalId));
+			detail.ifPresentOrElse(d -> exhibitionSyncFacade.applyDetailForJob(externalId, d),
+					() -> exhibitionSyncFacade.markDetailCheckedForJob(externalId));
 		} catch (org.springframework.dao.OptimisticLockingFailureException e) {
 			return false; // 반영 중 충돌 — 다른 워커가 처리
 		} catch (RuntimeException e) {
