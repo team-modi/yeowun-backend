@@ -14,7 +14,7 @@ import modi.backend.domain.exhibition.sync.port.ExhibitionCatalogClient;
 import modi.backend.domain.exhibition.hours.OpeningHoursFormatter;
 import modi.backend.domain.exhibition.sync.data.PlaceHoursData;
 import modi.backend.domain.exhibition.sync.port.PlaceHoursProvider;
-import modi.backend.infra.place.MockPlaceHoursProvider;
+import modi.backend.infra.exhibition.sync.mock.MockPlaceHoursProvider;
 
 /**
  * 게이팅 기본값 검증 — 설정 미주입(로컬·CI·develop)에서 주 조회기가 {@link MockPlaceHoursProvider}로 선택되어 유료 실호출이 0임을 보장한다.

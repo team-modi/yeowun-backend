@@ -1,4 +1,6 @@
-package modi.backend.infra.genre;
+package modi.backend.infra.exhibition.sync.gemini;
+
+import modi.backend.infra.exhibition.sync.mock.RandomGenreClassifier;
 
 import java.util.ArrayList;
 import java.util.List;

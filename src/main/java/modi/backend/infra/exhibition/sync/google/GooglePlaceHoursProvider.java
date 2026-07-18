@@ -1,4 +1,6 @@
-package modi.backend.infra.place;
+package modi.backend.infra.exhibition.sync.google;
+
+import modi.backend.infra.exhibition.sync.mock.MockPlaceHoursProvider;
 
 import java.time.DayOfWeek;
 import java.time.LocalTime;

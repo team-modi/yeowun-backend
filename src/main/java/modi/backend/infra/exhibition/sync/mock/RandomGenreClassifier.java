@@ -1,4 +1,6 @@
-package modi.backend.infra.genre;
+package modi.backend.infra.exhibition.sync.mock;
+
+import modi.backend.infra.exhibition.sync.gemini.GeminiGenreClassifier;
 
 import org.springframework.stereotype.Component;
 

@@ -1,5 +1,8 @@
 package modi.backend.infra.exhibition.sync;
 
+import modi.backend.infra.exhibition.sync.culture.CultureApiMapper;
+import modi.backend.infra.exhibition.sync.culture.CultureApiResponse;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 

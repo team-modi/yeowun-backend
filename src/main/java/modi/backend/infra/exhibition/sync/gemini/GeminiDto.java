@@ -1,4 +1,4 @@
-package modi.backend.infra.genre;
+package modi.backend.infra.exhibition.sync.gemini;
 
 import java.util.List;
 

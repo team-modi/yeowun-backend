@@ -1,4 +1,4 @@
-package modi.backend.infra.exhibition.sync;
+package modi.backend.infra.exhibition.sync.culture;
 
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.service.annotation.GetExchange;

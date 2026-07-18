@@ -1,5 +1,9 @@
 package modi.backend.infra.genre;
 
+import modi.backend.infra.exhibition.sync.gemini.GeminiApi;
+import modi.backend.infra.exhibition.sync.gemini.GeminiGenreClassifier;
+import modi.backend.infra.exhibition.sync.mock.RandomGenreClassifier;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;

@@ -1,4 +1,4 @@
-package modi.backend.infra.exhibition.sync;
+package modi.backend.infra.exhibition.sync.culture;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;

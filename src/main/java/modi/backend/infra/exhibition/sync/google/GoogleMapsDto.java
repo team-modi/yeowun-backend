@@ -1,4 +1,4 @@
-package modi.backend.infra.place;
+package modi.backend.infra.exhibition.sync.google;
 
 import java.util.List;
 import java.util.Optional;

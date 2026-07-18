@@ -1,5 +1,7 @@
 package modi.backend.infra.exhibition.sync;
 
+import modi.backend.infra.exhibition.sync.culture.CultureApiResponse;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;

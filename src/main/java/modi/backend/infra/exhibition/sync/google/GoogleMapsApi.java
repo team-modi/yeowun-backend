@@ -1,4 +1,7 @@
-package modi.backend.infra.place;
+package modi.backend.infra.exhibition.sync.google;
+
+import modi.backend.infra.exhibition.sync.culture.CultureApi;
+import modi.backend.infra.exhibition.sync.gemini.GeminiApi;
 
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;

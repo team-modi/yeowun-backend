@@ -1,4 +1,6 @@
-package modi.backend.infra.genre;
+package modi.backend.infra.exhibition.sync.gemini;
+
+import modi.backend.infra.exhibition.sync.culture.CultureApi;
 
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;

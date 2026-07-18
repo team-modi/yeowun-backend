@@ -1,5 +1,9 @@
 package modi.backend.infra.exhibition.sync;
 
+import modi.backend.infra.exhibition.sync.culture.CultureApi;
+import modi.backend.infra.exhibition.sync.culture.CultureApiMapper;
+import modi.backend.infra.exhibition.sync.culture.CultureExhibitionClient;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;

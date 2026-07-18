@@ -1,5 +1,7 @@
 package modi.backend.infra.genre;
 
+import modi.backend.infra.exhibition.sync.mock.RandomGenreClassifier;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.DisplayName;
