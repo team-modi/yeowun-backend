@@ -18,7 +18,7 @@ import modi.backend.domain.exhibition.catalog.Exhibition;
 import modi.backend.domain.exhibition.sync.ExhibitionCatalogClient;
 import modi.backend.domain.exhibition.catalog.ExhibitionCategory;
 import modi.backend.domain.exhibition.catalog.ExhibitionGenre;
-import modi.backend.domain.exhibition.catalog.ExhibitionGenreRepository;
+import modi.backend.infra.exhibition.catalog.ExhibitionGenreJpaRepository;
 import modi.backend.domain.exhibition.catalog.ExhibitionRegion;
 import modi.backend.domain.exhibition.catalog.ExhibitionRepository;
 import modi.backend.domain.exhibition.genre.GenreClassification;
@@ -50,7 +50,7 @@ class ExhibitionGenreWriteTest {
 	modi.backend.domain.exhibition.catalog.ExhibitionPlaceRepository exhibitionPlaceRepository;
 
 	@Autowired
-	ExhibitionGenreRepository exhibitionGenreRepository;
+	ExhibitionGenreJpaRepository exhibitionGenreRepository;
 
 	@MockitoBean
 	ExhibitionCatalogClient exhibitionCatalogClient;
@@ -108,7 +108,7 @@ class ExhibitionGenreWriteTest {
 		exhibitionFacade.applyGenres(targets,
 				List.of(GenreResult.ai("사진", GenreProvider.GEMINI, "gemini-2.5-flash")), LocalDateTime.now());
 
-		assertThat(exhibitionGenreRepository.findAllByExhibitionIds(List.of(seeded.getId()))).hasSize(1);
+		assertThat(exhibitionGenreRepository.findAllByExhibitionIdIn(List.of(seeded.getId()))).hasSize(1);
 		ExhibitionGenre canonical = canonical(seeded.getId());
 		assertThat(canonical.getGenreKeyword()).isEqualTo("사진");
 		assertThat(canonical.getProvider()).isEqualTo(GenreProvider.GEMINI.name());

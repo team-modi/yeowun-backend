@@ -13,7 +13,6 @@ import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import modi.backend.domain.exhibition.catalog.Exhibition;
 import modi.backend.domain.exhibition.catalog.ExhibitionDetail;
-import modi.backend.domain.exhibition.catalog.ExhibitionDetailRepository;
 import modi.backend.domain.exhibition.catalog.ExhibitionErrorCode;
 import modi.backend.domain.exhibition.catalog.ExhibitionHistory;
 import modi.backend.infra.exhibition.catalog.ExhibitionHistoryJpaRepository;
@@ -37,7 +36,6 @@ public class AdminExhibitionFacade {
 
 	private final ExhibitionRepository exhibitionRepository;
 	private final ExhibitionPlaceRepository exhibitionPlaceRepository;
-	private final ExhibitionDetailRepository exhibitionDetailRepository;
 	/** 사람 수정 이력(감사) — 실제로 바뀐 필드를 old→new로 남긴다. */
 	private final ExhibitionHistoryJpaRepository exhibitionHistoryRepository;
 
@@ -47,13 +45,13 @@ public class AdminExhibitionFacade {
 	 */
 	@Transactional
 	public AdminExhibitionResult.DescriptionReparse reparseDescriptions() {
-		List<ExhibitionDetail> rows = exhibitionDetailRepository.findAllWithDescription();
+		List<ExhibitionDetail> rows = exhibitionRepository.findDetailsWithDescription();
 		int updated = 0;
 		for (ExhibitionDetail detail : rows) {
 			String cleaned = HtmlTextExtractor.toPlainText(detail.getDescription());
 			if (!Objects.equals(cleaned, detail.getDescription())) {
 				detail.reparseDescription(cleaned);
-				exhibitionDetailRepository.save(detail);
+				exhibitionRepository.saveDetail(detail);
 				updated++;
 			}
 		}
@@ -114,11 +112,11 @@ public class AdminExhibitionFacade {
 		if (price == null && description == null) {
 			return List.of();
 		}
-		ExhibitionDetail detail = exhibitionDetailRepository.findByExhibitionId(exhibitionId)
+		ExhibitionDetail detail = exhibitionRepository.findDetail(exhibitionId)
 				.orElseGet(() -> ExhibitionDetail.markChecked(exhibitionId, LocalDateTime.now()));
 		List<FieldChange> changes = detail.applyAdminEdit(price, description);
 		if (!changes.isEmpty()) {
-			exhibitionDetailRepository.save(detail);
+			exhibitionRepository.saveDetail(detail);
 		}
 		return changes;
 	}

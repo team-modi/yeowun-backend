@@ -21,7 +21,7 @@ import modi.backend.domain.exhibition.enrichment.JobFailureType;
 import modi.backend.domain.exhibition.enrichment.JobStatus;
 import modi.backend.domain.exhibition.enrichment.JobType;
 import modi.backend.domain.exhibition.hours.PlaceHours;
-import modi.backend.domain.exhibition.hours.PlaceHoursRepository;
+import modi.backend.infra.exhibition.hours.PlaceHoursJpaRepository;
 import modi.backend.domain.exhibition.hours.PlaceHoursStatus;
 import modi.backend.domain.exhibition.hours.PlaceHoursVendor;
 
@@ -43,7 +43,7 @@ class EnrichmentJobFacadeIntegrationTest {
 	EnrichmentJobRepository enrichmentJobRepository;
 
 	@Autowired
-	PlaceHoursRepository placeHoursRepository;
+	PlaceHoursJpaRepository placeHoursRepository;
 
 	@Autowired
 	ExhibitionPlaceRepository exhibitionPlaceRepository;

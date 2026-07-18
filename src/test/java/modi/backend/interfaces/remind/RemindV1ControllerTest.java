@@ -61,7 +61,7 @@ class RemindV1ControllerTest {
 	modi.backend.domain.exhibition.catalog.ArtistRepository artistRepository;
 
 	@Autowired
-	modi.backend.domain.exhibition.catalog.ExhibitionArtistRepository exhibitionArtistRepository;
+	modi.backend.infra.exhibition.catalog.ExhibitionArtistJpaRepository exhibitionArtistRepository;
 
 	@Autowired
 	UserRepository userRepository;

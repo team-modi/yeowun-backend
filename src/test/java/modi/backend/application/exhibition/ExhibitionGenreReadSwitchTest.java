@@ -18,7 +18,7 @@ import modi.backend.domain.exhibition.catalog.Exhibition;
 import modi.backend.domain.exhibition.sync.ExhibitionCatalogClient;
 import modi.backend.domain.exhibition.catalog.ExhibitionCategory;
 import modi.backend.domain.exhibition.catalog.ExhibitionGenre;
-import modi.backend.domain.exhibition.catalog.ExhibitionGenreRepository;
+import modi.backend.infra.exhibition.catalog.ExhibitionGenreJpaRepository;
 import modi.backend.domain.exhibition.catalog.ExhibitionRegion;
 import modi.backend.domain.exhibition.catalog.ExhibitionRepository;
 import modi.backend.domain.exhibition.genre.GenreProvider;
@@ -48,7 +48,7 @@ class ExhibitionGenreReadSwitchTest {
 	modi.backend.domain.exhibition.catalog.ExhibitionPlaceRepository exhibitionPlaceRepository;
 
 	@Autowired
-	ExhibitionGenreRepository exhibitionGenreRepository;
+	ExhibitionGenreJpaRepository exhibitionGenreRepository;
 
 	@MockitoBean
 	ExhibitionCatalogClient exhibitionCatalogClient;

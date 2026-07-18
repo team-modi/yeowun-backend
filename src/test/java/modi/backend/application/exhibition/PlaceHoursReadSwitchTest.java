@@ -21,7 +21,7 @@ import modi.backend.domain.exhibition.catalog.ExhibitionPlaceRepository;
 import modi.backend.domain.exhibition.catalog.ExhibitionRegion;
 import modi.backend.domain.exhibition.catalog.ExhibitionRepository;
 import modi.backend.domain.exhibition.hours.PlaceHours;
-import modi.backend.domain.exhibition.hours.PlaceHoursRepository;
+import modi.backend.infra.exhibition.hours.PlaceHoursJpaRepository;
 import modi.backend.domain.exhibition.hours.PlaceHoursStatus;
 import modi.backend.domain.exhibition.hours.PlaceHoursVendor;
 
@@ -47,7 +47,7 @@ class PlaceHoursReadSwitchTest {
 	ExhibitionPlaceRepository exhibitionPlaceRepository;
 
 	@Autowired
-	PlaceHoursRepository placeHoursRepository;
+	PlaceHoursJpaRepository placeHoursRepository;
 
 	@MockitoBean
 	ExhibitionCatalogClient exhibitionCatalogClient;

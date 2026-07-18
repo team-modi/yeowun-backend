@@ -17,7 +17,6 @@ import modi.backend.application.exhibition.ExhibitionResult;
 import modi.backend.domain.bookmark.ExhibitionBookmarkRepository;
 import modi.backend.domain.exhibition.catalog.Exhibition;
 import modi.backend.domain.exhibition.catalog.ExhibitionDetail;
-import modi.backend.domain.exhibition.catalog.ExhibitionDetailRepository;
 import modi.backend.domain.exhibition.catalog.ExhibitionErrorCode;
 import modi.backend.domain.exhibition.catalog.ExhibitionPlace;
 import modi.backend.domain.exhibition.catalog.ExhibitionPlaceRepository;
@@ -41,7 +40,6 @@ public class BookmarkFacade {
 	private final ExhibitionBookmarkRepository exhibitionBookmarkRepository;
 	private final ExhibitionRepository exhibitionRepository;
 	private final ExhibitionPlaceRepository exhibitionPlaceRepository;
-	private final ExhibitionDetailRepository exhibitionDetailRepository;
 
 	/** 관심 등록(6.1, 멱등). 없는 전시면 404. 반환은 항상 bookmarked=true. */
 	@Transactional
@@ -86,7 +84,7 @@ public class BookmarkFacade {
 		Map<Long, ExhibitionPlace> placesById = exhibitionPlaceRepository.findAllByIds(
 				page.stream().map(Exhibition::getExhibitionPlaceId).collect(Collectors.toSet())).stream()
 				.collect(Collectors.toMap(ExhibitionPlace::getId, p -> p, (a, b) -> a));
-		Map<Long, ExhibitionDetail> detailsByExhibitionId = exhibitionDetailRepository.findAllByExhibitionIds(
+		Map<Long, ExhibitionDetail> detailsByExhibitionId = exhibitionRepository.findDetails(
 				page.stream().map(Exhibition::getId).toList()).stream()
 				.collect(Collectors.toMap(ExhibitionDetail::getExhibitionId, d -> d, (a, b) -> a));
 		List<ExhibitionResult.ListItem> content = page.stream()

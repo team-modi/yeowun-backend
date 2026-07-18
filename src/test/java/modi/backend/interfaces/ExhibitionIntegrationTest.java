@@ -74,7 +74,7 @@ class ExhibitionIntegrationTest {
 	modi.backend.domain.exhibition.catalog.ExhibitionPlaceRepository exhibitionPlaceRepository;
 
 	@Autowired
-	modi.backend.domain.exhibition.catalog.ExhibitionDetailRepository exhibitionDetailRepository;
+	modi.backend.infra.exhibition.catalog.ExhibitionDetailJpaRepository exhibitionDetailRepository;
 
 	@Autowired
 	ExhibitionBookmarkRepository exhibitionBookmarkRepository;

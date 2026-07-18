@@ -28,19 +28,16 @@ import modi.backend.infra.exhibition.sync.CultureDetailResponseJpaRepository;
 import modi.backend.domain.exhibition.sync.CultureListResponse;
 import modi.backend.infra.exhibition.sync.CultureListResponseJpaRepository;
 import modi.backend.domain.exhibition.catalog.Exhibition;
-import modi.backend.domain.exhibition.catalog.ExhibitionArtist;
-import modi.backend.domain.exhibition.catalog.ExhibitionArtistRepository;
 import modi.backend.domain.exhibition.sync.ExhibitionCatalogClient;
 import modi.backend.domain.exhibition.catalog.ExhibitionCategory;
 import modi.backend.domain.exhibition.catalog.ExhibitionDetail;
-import modi.backend.domain.exhibition.catalog.ExhibitionDetailRepository;
 import modi.backend.domain.exhibition.catalog.ExhibitionErrorCode;
 import modi.backend.domain.exhibition.catalog.ExhibitionFormat;
 import modi.backend.domain.exhibition.catalog.ExhibitionGenre;
-import modi.backend.domain.exhibition.catalog.ExhibitionGenreRepository;
 import modi.backend.domain.exhibition.catalog.ExhibitionPlace;
 import modi.backend.domain.exhibition.catalog.ExhibitionPlaceRepository;
 import modi.backend.domain.exhibition.catalog.ExhibitionQuery;
+import modi.backend.domain.exhibition.catalog.ExhibitionQueryRepository;
 import modi.backend.domain.exhibition.catalog.ExhibitionRegion;
 import modi.backend.domain.exhibition.catalog.ExhibitionRegionGroup;
 import modi.backend.domain.exhibition.catalog.ExhibitionRepository;
@@ -54,7 +51,6 @@ import modi.backend.infra.exhibition.hours.GooglePlaceResponseJpaRepository;
 import modi.backend.domain.exhibition.enrichment.JobType;
 import modi.backend.domain.exhibition.hours.PlaceHours;
 import modi.backend.domain.exhibition.hours.PlaceHoursData;
-import modi.backend.domain.exhibition.hours.PlaceHoursRepository;
 import modi.backend.domain.exhibition.hours.PlaceHoursStatus;
 import modi.backend.domain.exhibition.hours.PlaceHoursVendor;
 import modi.backend.domain.exhibition.sync.SyncRun;
@@ -84,25 +80,23 @@ public class ExhibitionFacade {
 	private static final int ENDING_SOON_DAYS = 7;
 	private static final int BANNER_LIMIT = 3;
 
+	/** 전시 애그리거트 루트 — 코어 쓰기와 부속(상세·장르·작가 조인) upsert의 단일 진입점. */
 	private final ExhibitionRepository exhibitionRepository;
+	/** 서빙 목록/탐색 전용(쓰기=루트, 읽기=쿼리 분리 — Specification·키셋 유지). */
+	private final ExhibitionQueryRepository exhibitionQueryRepository;
+	/** 전시장 애그리거트 루트(N:1 공유) — resolve-or-create와 영업시간 정준행(1:1)의 단일 진입점(ADR-05·06·07). */
+	private final ExhibitionPlaceRepository exhibitionPlaceRepository;
+	/** 작가(정규화 이름 UK, 독립 애그리거트) — CUSTOM 등록의 artist 문자열을 resolve-or-create해 조인으로 잇는다. */
+	private final ArtistRepository artistRepository;
 	private final ExhibitionCatalogClient catalogClient;
 	private final ExhibitionBookmarkRepository exhibitionBookmarkRepository;
 	private final VenueRepository venueRepository;
 	private final RecordJpaRepository recordJpaRepository;
-	private final PlaceHoursRepository placeHoursRepository;
 	private final GooglePlaceResponseJpaRepository googlePlaceResponseRepository;
 	private final GenreClassifier genreClassifier;
-	private final ExhibitionGenreRepository exhibitionGenreRepository;
 	private final CultureListResponseJpaRepository cultureListResponseRepository;
 	private final CultureDetailResponseJpaRepository cultureDetailResponseRepository;
 	private final SyncRunRepository syncRunRepository;
-	/** 전시장(N:1) — 자연키=정규화 이름. 장소·지역·gps·주소의 진실 원천이자 영업시간 정렬 기준(ADR-05·06·07). */
-	private final ExhibitionPlaceRepository exhibitionPlaceRepository;
-	/** 상세 satellite(1:1) — price/description/img. 연관 부재 = 미동기화(ADR-03). */
-	private final ExhibitionDetailRepository exhibitionDetailRepository;
-	/** 작가(정규화 이름 UK) + 조인(N:M) — CUSTOM 등록의 artist 문자열을 resolve-or-create해 조인으로 잇는다. */
-	private final ArtistRepository artistRepository;
-	private final ExhibitionArtistRepository exhibitionArtistRepository;
 	/** 통합 보강 작업큐 — 상세 실패 재시도·이벤트 구동 영업시간 재검증을 enqueue한다(at-least-once의 진입점). */
 	private final EnrichmentJobFacade enrichmentJobFacade;
 
@@ -138,13 +132,13 @@ public class ExhibitionFacade {
 		ExhibitionQuery query = buildQuery(keyword, ongoingOn, regions, categories, section, today,
 				criteria.period(), sort, cursorKey, cursorId, criteria.requesterId());
 
-		List<Exhibition> rows = exhibitionRepository.searchSlice(query, size + 1);
+		List<Exhibition> rows = exhibitionQueryRepository.searchSlice(query, size + 1);
 		boolean hasNext = rows.size() > size;
 		List<Exhibition> page = hasNext ? rows.subList(0, size) : rows;
 
 		List<ExhibitionResult.ListItem> content = toListItems(page, today, criteria.requesterId());
 		String nextCursor = hasNext ? encodeCursor(sort, page.get(page.size() - 1)) : null;
-		long totalCount = exhibitionRepository.count(query);
+		long totalCount = exhibitionQueryRepository.count(query);
 		return new ExhibitionResult.ListPage(content, nextCursor, hasNext, totalCount);
 	}
 
@@ -154,8 +148,8 @@ public class ExhibitionFacade {
 			return List.of();
 		}
 		Map<Long, ExhibitionPlace> placesById = placesByIdFor(page);
-		Map<Long, ExhibitionDetail> detailsByExhibitionId = exhibitionDetailRepository
-				.findAllByExhibitionIds(page.stream().map(Exhibition::getId).toList()).stream()
+		Map<Long, ExhibitionDetail> detailsByExhibitionId = exhibitionRepository
+				.findDetails(page.stream().map(Exhibition::getId).toList()).stream()
 				.collect(Collectors.toMap(ExhibitionDetail::getExhibitionId, d -> d, (a, b) -> a));
 		Set<Long> bookmarked = bookmarkedIds(requesterId, page);
 		return page.stream().map(e -> {
@@ -177,7 +171,7 @@ public class ExhibitionFacade {
 	 */
 	@Transactional(readOnly = true)
 	public List<ExhibitionResult.Banner> banners() {
-		List<Exhibition> rows = exhibitionRepository.findOngoingCatalogTopByViews(LocalDate.now(AppTime.KST),
+		List<Exhibition> rows = exhibitionQueryRepository.findOngoingCatalogTopByViews(LocalDate.now(AppTime.KST),
 				BANNER_LIMIT);
 		Map<Long, ExhibitionPlace> placesById = placesByIdFor(rows);
 		return rows.stream()
@@ -196,7 +190,7 @@ public class ExhibitionFacade {
 		}
 		double lat = criteria.lat();
 		double lng = criteria.lng();
-		List<Exhibition> candidates = exhibitionRepository.searchAll(query);
+		List<Exhibition> candidates = exhibitionQueryRepository.searchAll(query);
 		Map<Long, ExhibitionPlace> placesById = placesByIdFor(candidates);
 		List<Exhibition> ordered = candidates.stream()
 				.sorted(distanceComparator(placesById, lat, lng))
@@ -230,7 +224,7 @@ public class ExhibitionFacade {
 		if (!exhibition.isAccessibleBy(criteria.requesterId())) {
 			throw new CoreException(ErrorType.FORBIDDEN, "타인의 개인 전시 접근: " + criteria.exhibitionId());
 		}
-		if (exhibition.isCatalog() && !exhibitionDetailRepository.existsByExhibitionId(exhibition.getId())) {
+		if (exhibition.isCatalog() && !exhibitionRepository.hasDetail(exhibition.getId())) {
 			try {
 				catalogClient.fetchDetail(exhibition.getExternalId())
 						.ifPresent(d -> applyCatalogDetail(exhibition, d, LocalDateTime.now()));
@@ -262,16 +256,16 @@ public class ExhibitionFacade {
 	/** 상세 응답 조립 — 장소·상세·영업시간·작가·장르를 각 저장소에서 읽어 하나로 모은다. */
 	private ExhibitionResult.Detail assembleDetail(Exhibition exhibition, boolean bookmarked, boolean recorded) {
 		ExhibitionPlace place = exhibitionPlaceRepository.findById(exhibition.getExhibitionPlaceId()).orElse(null);
-		ExhibitionDetail detail = exhibitionDetailRepository.findByExhibitionId(exhibition.getId()).orElse(null);
+		ExhibitionDetail detail = exhibitionRepository.findDetail(exhibition.getId()).orElse(null);
 		PlaceHours placeHours = place == null ? null
-				: placeHoursRepository.findByExhibitionPlaceId(place.getId()).orElse(null);
-		List<String> artistNames = exhibitionArtistRepository.findArtistNames(exhibition.getId());
+				: exhibitionPlaceRepository.findHours(place.getId()).orElse(null);
+		List<String> artistNames = exhibitionRepository.findArtistNames(exhibition.getId());
 		return ExhibitionResult.Detail.from(exhibition, place, detail, placeHours, artistNames,
 				genreOf(exhibition.getId()), bookmarked, recorded);
 	}
 
 	private ExhibitionGenre genreOf(Long exhibitionId) {
-		return exhibitionGenreRepository.findByExhibitionId(exhibitionId).orElse(null);
+		return exhibitionRepository.findGenre(exhibitionId).orElse(null);
 	}
 
 	/**
@@ -294,7 +288,7 @@ public class ExhibitionFacade {
 			}
 		}
 		// place·venueId 모두 없으면 장소 미상 센티넬로 수렴한다(exhibition_place_id NOT NULL 지탱) — 제목만 등록도 그대로 동작한다.
-		ExhibitionPlace place = resolvePlace(placeName, region, null, null, null);
+		ExhibitionPlace place = exhibitionPlaceRepository.resolveOrCreate(placeName, region, null, null, null);
 		// 장르: 사용자가 직접 고르면 그 값(provider=USER), 미지정이면 분류기(랜덤/AI)가 부여한다(실패해도 유효 장르 반환).
 		GenreResult genre;
 		if (criteria.genreKeyword() != null && !criteria.genreKeyword().isBlank()) {
@@ -310,22 +304,8 @@ public class ExhibitionFacade {
 				criteria.startDate(), criteria.endDate(), category, format, criteria.artist(), criteria.posterUrl());
 		Exhibition saved = exhibitionRepository.save(exhibition);
 		linkArtist(saved.getId(), criteria.artist());
-		exhibitionGenreRepository.save(ExhibitionGenre.create(saved.getId(), genre.genreKeyword(),
-				genre.provider(), genre.model(), LocalDateTime.now()));
+		exhibitionRepository.applyGenre(saved.getId(), genre, LocalDateTime.now());
 		return ExhibitionResult.Created.from(saved);
-	}
-
-	/** 전시장 resolve-or-create — 정규화 이름 기준 upsert. 기존 행이면 비어 있던 신원 필드만 보강한다(ADR-07). */
-	private ExhibitionPlace resolvePlace(String name, ExhibitionRegion region, String sigungu, Double gpsX,
-			Double gpsY) {
-		String placeKey = modi.backend.domain.exhibition.hours.PlaceKey.of(name);
-		return exhibitionPlaceRepository.findByPlaceKey(placeKey)
-				.map(existing -> {
-					existing.enrichIdentity(region, sigungu, gpsX, gpsY);
-					return exhibitionPlaceRepository.save(existing);
-				})
-				.orElseGet(() -> exhibitionPlaceRepository
-						.save(ExhibitionPlace.createFromList(name, region, sigungu, gpsX, gpsY)));
 	}
 
 	/** 작가 문자열을 resolve-or-create(정규화 이름 UK)해 전시와 조인(멱등)한다. 이름이 비면 건너뛴다. */
@@ -336,9 +316,7 @@ public class ExhibitionFacade {
 		}
 		Artist artist = artistRepository.findByName(normalized)
 				.orElseGet(() -> artistRepository.save(Artist.create(normalized)));
-		if (!exhibitionArtistRepository.existsByExhibitionIdAndArtistId(exhibitionId, artist.getId())) {
-			exhibitionArtistRepository.save(ExhibitionArtist.of(exhibitionId, artist.getId()));
-		}
+		exhibitionRepository.linkArtist(exhibitionId, artist.getId());
 	}
 
 	/**
@@ -365,8 +343,8 @@ public class ExhibitionFacade {
 			return List.of();
 		}
 		Map<Long, ExhibitionPlace> placesById = placesByIdFor(rows);
-		Map<Long, ExhibitionDetail> detailsByExhibitionId = exhibitionDetailRepository
-				.findAllByExhibitionIds(rows.stream().map(Exhibition::getId).toList()).stream()
+		Map<Long, ExhibitionDetail> detailsByExhibitionId = exhibitionRepository
+				.findDetails(rows.stream().map(Exhibition::getId).toList()).stream()
 				.collect(Collectors.toMap(ExhibitionDetail::getExhibitionId, d -> d, (a, b) -> a));
 		return rows.stream().map(e -> {
 			ExhibitionPlace place = placesById.get(e.getExhibitionPlaceId());
@@ -392,8 +370,6 @@ public class ExhibitionFacade {
 		List<Long> ids = targets.stream().map(GenreTarget::exhibitionId).toList();
 		Map<Long, Exhibition> exhibitionsById = exhibitionRepository.findAllActiveByIds(ids).stream()
 				.collect(Collectors.toMap(Exhibition::getId, e -> e));
-		Map<Long, ExhibitionGenre> genresById = exhibitionGenreRepository.findAllByExhibitionIds(ids).stream()
-				.collect(Collectors.toMap(ExhibitionGenre::getExhibitionId, g -> g));
 		int applied = 0;
 		for (int i = 0; i < targets.size(); i++) {
 			GenreResult result = i < results.size() ? results.get(i) : null;
@@ -401,21 +377,10 @@ public class ExhibitionFacade {
 			if (result == null || exhibition == null) {
 				continue;
 			}
-			saveCanonicalGenre(exhibition.getId(), result, genresById.get(exhibition.getId()), now);
+			exhibitionRepository.applyGenre(exhibition.getId(), result, now);
 			applied++;
 		}
 		return applied;
-	}
-
-	private void saveCanonicalGenre(Long exhibitionId, GenreResult result, ExhibitionGenre existing,
-			LocalDateTime now) {
-		if (existing == null) {
-			exhibitionGenreRepository.save(ExhibitionGenre.create(exhibitionId, result.genreKeyword(),
-					result.provider(), result.model(), now));
-			return;
-		}
-		existing.reclassify(result.genreKeyword(), result.provider(), result.model(), now);
-		exhibitionGenreRepository.save(existing);
 	}
 
 	// ── 통합 작업큐 처리기(enricher) 지원 — 조회/반영을 값으로 주고받아 외부 호출을 트랜잭션 밖에 둔다 ──────────
@@ -440,7 +405,7 @@ public class ExhibitionFacade {
 			return Map.of();
 		}
 		List<Long> ids = exhibitions.stream().map(Exhibition::getId).toList();
-		Set<Long> classified = exhibitionGenreRepository.findAllByExhibitionIds(ids).stream()
+		Set<Long> classified = exhibitionRepository.findGenres(ids).stream()
 				.map(ExhibitionGenre::getExhibitionId).collect(Collectors.toSet());
 		Map<String, GenreClassification> inputs = new java.util.HashMap<>();
 		for (Exhibition e : exhibitions) {
@@ -461,13 +426,10 @@ public class ExhibitionFacade {
 		if (exhibitions.isEmpty()) {
 			return;
 		}
-		List<Long> ids = exhibitions.stream().map(Exhibition::getId).toList();
-		Map<Long, ExhibitionGenre> existing = exhibitionGenreRepository.findAllByExhibitionIds(ids).stream()
-				.collect(Collectors.toMap(ExhibitionGenre::getExhibitionId, g -> g));
 		for (Exhibition e : exhibitions) {
 			GenreResult result = resultsByExternalId.get(e.getExternalId());
 			if (result != null) {
-				saveCanonicalGenre(e.getId(), result, existing.get(e.getId()), now);
+				exhibitionRepository.applyGenre(e.getId(), result, now);
 			}
 		}
 	}
@@ -479,7 +441,7 @@ public class ExhibitionFacade {
 		if (exhibition == null) {
 			return DetailTargetState.MISSING;
 		}
-		return exhibitionDetailRepository.existsByExhibitionId(exhibition.getId())
+		return exhibitionRepository.hasDetail(exhibition.getId())
 				? DetailTargetState.ALREADY_SYNCED : DetailTargetState.NEEDS_DETAIL;
 	}
 
@@ -487,7 +449,7 @@ public class ExhibitionFacade {
 	@Transactional
 	public void applyDetailForJob(String externalId, CatalogDetailData detail) {
 		Exhibition exhibition = exhibitionRepository.findByExternalId(externalId).orElse(null);
-		if (exhibition == null || exhibitionDetailRepository.existsByExhibitionId(exhibition.getId())) {
+		if (exhibition == null || exhibitionRepository.hasDetail(exhibition.getId())) {
 			return;
 		}
 		applyCatalogDetail(exhibition, detail, LocalDateTime.now());
@@ -500,10 +462,10 @@ public class ExhibitionFacade {
 	@Transactional
 	public void markDetailCheckedForJob(String externalId) {
 		Exhibition exhibition = exhibitionRepository.findByExternalId(externalId).orElse(null);
-		if (exhibition == null || exhibitionDetailRepository.existsByExhibitionId(exhibition.getId())) {
+		if (exhibition == null || exhibitionRepository.hasDetail(exhibition.getId())) {
 			return;
 		}
-		saveCheckedDetail(exhibition.getId(), LocalDateTime.now());
+		exhibitionRepository.markDetailChecked(exhibition.getId(), LocalDateTime.now());
 	}
 
 	/**
@@ -538,7 +500,7 @@ public class ExhibitionFacade {
 			PlaceHoursVendor vendor, LocalDateTime now) {
 		Long placeId = target.exhibitionPlaceId();
 		archiveGooglePlaceResponse(placeId, data, vendor, now);
-		savePlaceHours(placeId, formatted, PlaceHoursStatus.of(data, formatted), vendor, now);
+		exhibitionPlaceRepository.applyHours(placeId, formatted, PlaceHoursStatus.of(data, formatted), vendor, now);
 	}
 
 	/** 조회가 전송 오류로 실패했음을 정준층에 남긴다(재시도 대상). 표시값·동기화 시각은 지키지 않아 다음 주기 재시도가 유지된다. */
@@ -546,12 +508,7 @@ public class ExhibitionFacade {
 	public void recordVenueHoursFailure(PlaceHoursTarget target, PlaceHoursVendor vendor) {
 		Long placeId = target.exhibitionPlaceId();
 		try {
-			placeHoursRepository.findByExhibitionPlaceId(placeId)
-					.ifPresentOrElse(row -> {
-						row.recordFailure(vendor);
-						placeHoursRepository.save(row);
-					}, () -> placeHoursRepository.save(
-							PlaceHours.first(placeId, null, PlaceHoursStatus.FAILED, vendor, null)));
+			exhibitionPlaceRepository.markHoursFailure(placeId, vendor);
 		} catch (RuntimeException e) {
 			log.warn("영업시간 실패 기록 실패(placeId={}, 보강은 계속): {}", placeId, e.getMessage());
 		}
@@ -569,19 +526,6 @@ public class ExhibitionFacade {
 					googlePlaceResponseRepository.save(row);
 				}, () -> googlePlaceResponseRepository.save(
 						GooglePlaceResponse.first(placeId, data.rawJson(), now)));
-	}
-
-	/** 정준층 upsert — 없으면 생성, 있으면 갱신(영업시간은 바뀌는 값이라 덮어쓰기가 정상 동작). synced_at은 성공 확인 시각(재검증 간격 판정 기준). */
-	private void savePlaceHours(Long placeId, String formatted, PlaceHoursStatus status, PlaceHoursVendor vendor,
-			LocalDateTime now) {
-		if (placeId == null) {
-			return;
-		}
-		placeHoursRepository.findByExhibitionPlaceId(placeId)
-				.ifPresentOrElse(row -> {
-					row.refresh(formatted, status, vendor, now);
-					placeHoursRepository.save(row);
-				}, () -> placeHoursRepository.save(PlaceHours.first(placeId, formatted, status, vendor, now)));
 	}
 
 	/**
@@ -653,7 +597,7 @@ public class ExhibitionFacade {
 	private SyncOutcome syncListedWithDetail(CatalogExhibitionData data) {
 		Exhibition existing = exhibitionRepository.findByExternalId(data.externalId()).orElse(null);
 		if (existing != null) {
-			if (exhibitionDetailRepository.existsByExhibitionId(existing.getId())) {
+			if (exhibitionRepository.hasDetail(existing.getId())) {
 				return SyncOutcome.SKIPPED;
 			}
 			applyDetailOrCheck(existing);
@@ -662,12 +606,14 @@ public class ExhibitionFacade {
 		// 신규는 상세를 <b>먼저</b> 받아본다 — 상세 호출이 일시 실패하면 아무것도 적재하지 않고 이 행만 다음 주기로 연기한다
 		// (불완전한 행·전시장만 남기지 않는다). 상세가 성공/빈 응답일 때만 전시장 resolve + 전시·상세 적재로 진행한다.
 		java.util.Optional<CatalogDetailData> detail = fetchDetailDeferring(data.externalId());
-		ExhibitionPlace place = resolvePlace(data.place(), data.region(), data.sigungu(), data.gpsX(), data.gpsY());
+		ExhibitionPlace place = exhibitionPlaceRepository.resolveOrCreate(data.place(), data.region(), data.sigungu(),
+				data.gpsX(), data.gpsY());
 		Exhibition saved = exhibitionRepository.save(Exhibition.createCatalog(data.externalId(), data.title(),
 				place.getId(), data.startDate(), data.endDate(), data.category(), data.posterUrl(), data.detailUrl(),
 				data.serviceName()));
 		LocalDateTime now = LocalDateTime.now();
-		detail.ifPresentOrElse(d -> applyCatalogDetail(saved, d, now), () -> saveCheckedDetail(saved.getId(), now));
+		detail.ifPresentOrElse(d -> applyCatalogDetail(saved, d, now),
+				() -> exhibitionRepository.markDetailChecked(saved.getId(), now));
 		archiveDetailOutcome(data.externalId(), detail.orElse(null));
 		// 이벤트 구동 재검증(설계 §4-1): 새 전시가 기존 장소(place_hours 존재)에 들어오면 재검증 enqueue한다. target_key는
 		// 전시장 자연키(정규화 이름). 가드(기존 장소만·최소 간격·UK 중복)는 큐 파사드가 판단한다.
@@ -692,7 +638,7 @@ public class ExhibitionFacade {
 		java.util.Optional<CatalogDetailData> detail = fetchDetailDeferring(exhibition.getExternalId());
 		LocalDateTime now = LocalDateTime.now();
 		detail.ifPresentOrElse(d -> applyCatalogDetail(exhibition, d, now),
-				() -> saveCheckedDetail(exhibition.getId(), now));
+				() -> exhibitionRepository.markDetailChecked(exhibition.getId(), now));
 		archiveDetailOutcome(exhibition.getExternalId(), detail.orElse(null));
 	}
 
@@ -708,25 +654,13 @@ public class ExhibitionFacade {
 		}
 	}
 
-	/** 상세 값을 상세 satellite에 upsert하고, 전시장 보강 필드(주소/전화/홈페이지)를 채운다. */
+	/** 상세 값을 상세 satellite에 upsert(전시 애그리거트)하고, 전시장 보강 필드(주소/전화/홈페이지)를 채운다 — 두 애그리거트 조율. */
 	private void applyCatalogDetail(Exhibition exhibition, CatalogDetailData d, LocalDateTime now) {
-		exhibitionDetailRepository.findByExhibitionId(exhibition.getId())
-				.ifPresentOrElse(row -> {
-					row.update(d.price(), d.description(), d.imgUrl(), now);
-					exhibitionDetailRepository.save(row);
-				}, () -> exhibitionDetailRepository.save(
-						ExhibitionDetail.create(exhibition.getId(), d.price(), d.description(), d.imgUrl(), now)));
+		exhibitionRepository.applyDetail(exhibition.getId(), d.price(), d.description(), d.imgUrl(), now);
 		exhibitionPlaceRepository.findById(exhibition.getExhibitionPlaceId()).ifPresent(place -> {
 			place.enrichDetail(d.placeAddr(), d.phone(), d.placeUrl());
 			exhibitionPlaceRepository.save(place);
 		});
-	}
-
-	/** 상세를 확인했으나 원천에 값이 없음 — 확인 완료행만 남겨 재조회 대상에서 빠지게 한다(멱등). */
-	private void saveCheckedDetail(Long exhibitionId, LocalDateTime now) {
-		if (!exhibitionDetailRepository.existsByExhibitionId(exhibitionId)) {
-			exhibitionDetailRepository.save(ExhibitionDetail.markChecked(exhibitionId, now));
-		}
 	}
 
 	private void archiveListResponse(CatalogExhibitionData data, LocalDateTime syncedAt) {

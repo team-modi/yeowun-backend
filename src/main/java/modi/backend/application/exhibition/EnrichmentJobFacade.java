@@ -16,7 +16,6 @@ import modi.backend.domain.exhibition.catalog.ExhibitionPlaceRepository;
 import modi.backend.domain.exhibition.enrichment.JobFailureType;
 import modi.backend.domain.exhibition.enrichment.JobType;
 import modi.backend.domain.exhibition.hours.PlaceHours;
-import modi.backend.domain.exhibition.hours.PlaceHoursRepository;
 
 /**
  * 통합 보강 작업큐 유스케이스 조율 — enqueue(멱등)·선별·상태 전이만 맡는다. 실제 외부 작업(상세 조회·AI 분류·
@@ -31,7 +30,6 @@ public class EnrichmentJobFacade {
 
 	private final EnrichmentJobRepository enrichmentJobRepository;
 	/** 이벤트 구동 영업시간 재검증 가드(설계 §4-1)를 위해 정준 영업시간 테이블을 읽는다. */
-	private final PlaceHoursRepository placeHoursRepository;
 	/** target_key(=exhibition_place.place_key, 정규화 이름 — ADR-07)로 전시장을 해소해 정준 영업시간을 찾는다. */
 	private final ExhibitionPlaceRepository exhibitionPlaceRepository;
 	private final EnrichmentProperties properties;
@@ -78,7 +76,7 @@ public class EnrichmentJobFacade {
 		if (place == null) {
 			return; // 아직 그 이름의 전시장이 없다(비정상 유입) — 재검증 대상 아님.
 		}
-		PlaceHours placeHours = placeHoursRepository.findByExhibitionPlaceId(place.getId()).orElse(null);
+		PlaceHours placeHours = exhibitionPlaceRepository.findHours(place.getId()).orElse(null);
 		if (placeHours == null) {
 			return; // 가드 1: 최초 조회 전 장소는 재검증 이벤트 대상이 아니다.
 		}

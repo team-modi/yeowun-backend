@@ -57,7 +57,7 @@ class CultureVendorArchiveTest {
 	ExhibitionRepository exhibitionRepository;
 
 	@Autowired
-	modi.backend.domain.exhibition.catalog.ExhibitionDetailRepository exhibitionDetailRepository;
+	modi.backend.infra.exhibition.catalog.ExhibitionDetailJpaRepository exhibitionDetailRepository;
 
 	@Autowired
 	CultureListResponseJpaRepository cultureListResponseRepository;

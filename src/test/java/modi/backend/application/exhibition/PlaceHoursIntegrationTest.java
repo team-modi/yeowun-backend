@@ -28,7 +28,7 @@ import modi.backend.domain.exhibition.catalog.ExhibitionRegion;
 import modi.backend.domain.exhibition.hours.PlaceHours;
 import modi.backend.domain.exhibition.hours.PlaceHoursData;
 import modi.backend.domain.exhibition.hours.PlaceHoursProvider;
-import modi.backend.domain.exhibition.hours.PlaceHoursRepository;
+import modi.backend.infra.exhibition.hours.PlaceHoursJpaRepository;
 import modi.backend.domain.exhibition.hours.PlaceHoursStatus;
 import modi.backend.domain.exhibition.hours.PlaceHoursVendor;
 import modi.backend.domain.exhibition.hours.WeeklyOpeningHours;
@@ -57,7 +57,7 @@ class PlaceHoursIntegrationTest {
 	GooglePlaceResponseJpaRepository googlePlaceResponseJpaRepository;
 
 	@Autowired
-	PlaceHoursRepository placeHoursRepository;
+	PlaceHoursJpaRepository placeHoursRepository;
 
 	@MockitoBean
 	PlaceHoursProvider placeHoursProvider;

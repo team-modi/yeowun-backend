@@ -16,14 +16,13 @@ import lombok.RequiredArgsConstructor;
 import modi.backend.domain.exhibition.catalog.Exhibition;
 import modi.backend.domain.exhibition.catalog.ExhibitionCategory;
 import modi.backend.domain.exhibition.catalog.ExhibitionDetail;
-import modi.backend.domain.exhibition.catalog.ExhibitionDetailRepository;
 import modi.backend.domain.exhibition.catalog.ExhibitionPlace;
 import modi.backend.domain.exhibition.catalog.ExhibitionPlaceRepository;
 import modi.backend.domain.exhibition.catalog.ExhibitionQuery;
 import modi.backend.domain.exhibition.catalog.ExhibitionRegion;
+import modi.backend.domain.exhibition.catalog.ExhibitionQueryRepository;
 import modi.backend.domain.exhibition.catalog.ExhibitionRepository;
 import modi.backend.domain.exhibition.hours.PlaceHours;
-import modi.backend.domain.exhibition.hours.PlaceHoursRepository;
 import modi.backend.domain.exhibition.hours.PlaceHoursStatus;
 import modi.backend.domain.exhibition.hours.PlaceHoursVendor;
 import modi.backend.support.time.AppTime;
@@ -45,9 +44,8 @@ public class ExhibitionDemoSeeder implements ApplicationRunner {
 	private static final String REALM_NAME = "전시";
 
 	private final ExhibitionRepository exhibitionRepository;
+	private final ExhibitionQueryRepository exhibitionQueryRepository;
 	private final ExhibitionPlaceRepository exhibitionPlaceRepository;
-	private final ExhibitionDetailRepository exhibitionDetailRepository;
-	private final PlaceHoursRepository placeHoursRepository;
 
 	@Override
 	public void run(ApplicationArguments args) {
@@ -56,7 +54,7 @@ public class ExhibitionDemoSeeder implements ApplicationRunner {
 
 	/** 카탈로그가 비어 있으면(키 미설정 등) 응답 전 필드를 채운 표본 + MOCK을 적재한다. */
 	private void seedSamplesIfEmpty() {
-		if (exhibitionRepository.count(ExhibitionQuery.unfiltered()) > 0) {
+		if (exhibitionQueryRepository.count(ExhibitionQuery.unfiltered()) > 0) {
 			log.info("데모 시드: 카탈로그가 이미 존재 — 표본 적재 스킵");
 			return;
 		}
@@ -125,10 +123,10 @@ public class ExhibitionDemoSeeder implements ApplicationRunner {
 					r.externalId(), r.title(), place.getId(), r.startDate(), r.endDate(), r.category(),
 					r.posterUrl(), r.detailUrl(), SERVICE_NAME));
 			// 상세 satellite(price·description·img) + 영업시간 정준행(operatingHours) — 응답 전 필드가 채워지게.
-			exhibitionDetailRepository.save(ExhibitionDetail.create(saved.getId(), r.price(), r.description(),
+			exhibitionRepository.saveDetail(ExhibitionDetail.create(saved.getId(), r.price(), r.description(),
 					r.posterUrl(), now));
-			if (placeHoursRepository.findByExhibitionPlaceId(place.getId()).isEmpty()) {
-				placeHoursRepository.save(PlaceHours.first(place.getId(), r.operatingHours(),
+			if (exhibitionPlaceRepository.findHours(place.getId()).isEmpty()) {
+				exhibitionPlaceRepository.saveHours(PlaceHours.first(place.getId(), r.operatingHours(),
 						PlaceHoursStatus.SUCCEEDED, PlaceHoursVendor.MOCK, now));
 			}
 		});
