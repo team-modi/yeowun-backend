@@ -9,7 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
+import org.springframework.web.client.HttpClientErrorException;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -90,7 +90,7 @@ public class GeminiGenreClassifier implements GenreClassifier {
 			}
 			log.warn("Gemini 장르 응답이 마스터에 없음(genre={}) — 랜덤 폴백", genre);
 			return fallbackWith("invalid_response", input);
-		} catch (WebClientResponseException.TooManyRequests e) {
+		} catch (HttpClientErrorException.TooManyRequests e) {
 			log.warn("Gemini 무료 한도 초과(429) 재시도 소진 — 랜덤 폴백");
 			return fallbackWith("rate_limited", input);
 		} catch (RuntimeException e) {
@@ -131,7 +131,7 @@ public class GeminiGenreClassifier implements GenreClassifier {
 				}
 			}
 			return result;
-		} catch (WebClientResponseException.TooManyRequests e) {
+		} catch (HttpClientErrorException.TooManyRequests e) {
 			log.warn("Gemini 배치 무료 한도 초과(429) 재시도 소진 — 랜덤 폴백 {}건", inputs.size());
 			count("fallback_rate_limited_batch");
 			return fallback.classifyAll(inputs);
@@ -151,11 +151,11 @@ public class GeminiGenreClassifier implements GenreClassifier {
 	private GeminiDto.Response callWithRetry(GenreClassification input) {
 		GeminiDto.Request request = buildRequest(input);
 		int attempts = properties.maxRetries() + 1;
-		WebClientResponseException.TooManyRequests last = null;
+		HttpClientErrorException.TooManyRequests last = null;
 		for (int i = 0; i < attempts; i++) {
 			try {
 				return geminiApi.generateContent(properties.model(), properties.apiKey(), request);
-			} catch (WebClientResponseException.TooManyRequests e) {
+			} catch (HttpClientErrorException.TooManyRequests e) {
 				last = e;
 				count("retry_429");
 				if (i < attempts - 1) {
@@ -182,11 +182,11 @@ public class GeminiGenreClassifier implements GenreClassifier {
 	private GeminiDto.Response callBatchWithRetry(List<GenreClassification> inputs) {
 		GeminiDto.Request request = buildBatchRequest(inputs);
 		int attempts = properties.maxRetries() + 1;
-		WebClientResponseException.TooManyRequests last = null;
+		HttpClientErrorException.TooManyRequests last = null;
 		for (int i = 0; i < attempts; i++) {
 			try {
 				return geminiApi.generateContent(properties.model(), properties.apiKey(), request);
-			} catch (WebClientResponseException.TooManyRequests e) {
+			} catch (HttpClientErrorException.TooManyRequests e) {
 				last = e;
 				count("retry_429");
 				if (i < attempts - 1) {
@@ -229,9 +229,9 @@ public class GeminiGenreClassifier implements GenreClassifier {
 	}
 
 	/** 429 백오프 — 응답의 Retry-After(초)를 존중하되 설정 상한(max-retry-delay-seconds)으로 캡한다(부팅 지연 방지). */
-	private void backoff(WebClientResponseException.TooManyRequests e) {
+	private void backoff(HttpClientErrorException.TooManyRequests e) {
 		long capSeconds = properties.maxRetryDelaySeconds();
-		long waitSeconds = Math.min(retryAfterSeconds(e.getHeaders()), capSeconds);
+		long waitSeconds = Math.min(retryAfterSeconds(e.getResponseHeaders()), capSeconds);
 		if (waitSeconds <= 0) {
 			return;
 		}

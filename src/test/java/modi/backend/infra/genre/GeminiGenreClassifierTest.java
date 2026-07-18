@@ -13,8 +13,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.support.WebClientAdapter;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.support.RestClientAdapter;
 import org.springframework.web.service.invoker.HttpServiceProxyFactory;
 
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -53,8 +53,12 @@ class GeminiGenreClassifierTest {
 	}
 
 	private GeminiGenreClassifier classifierWith(GeminiProperties properties) {
-		WebClient webClient = WebClient.builder().baseUrl(properties.baseUrl()).build();
-		GeminiApi api = HttpServiceProxyFactory.builderFor(WebClientAdapter.create(webClient)).build()
+		// 운영 조립(GenreConfig)과 동일하게 JDK 팩토리 고정 — 테스트 클래스패스의 Apache HttpClient5(Testcontainers 전이)가
+		// 자동감지되면 429를 전송 계층에서 한 번 더 재시도해(DefaultHttpRequestRetryStrategy) 요청 수 검증이 깨진다.
+		RestClient restClient = RestClient.builder().baseUrl(properties.baseUrl())
+				.requestFactory(new org.springframework.http.client.JdkClientHttpRequestFactory())
+				.build();
+		GeminiApi api = HttpServiceProxyFactory.builderFor(RestClientAdapter.create(restClient)).build()
 				.createClient(GeminiApi.class);
 		return new GeminiGenreClassifier(api, properties, new RandomGenreClassifier(), new SimpleMeterRegistry());
 	}

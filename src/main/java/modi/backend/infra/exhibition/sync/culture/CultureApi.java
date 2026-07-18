@@ -4,8 +4,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.service.annotation.GetExchange;
 
 /**
- * 한눈에보는문화정보(15138937) realm2(목록)·detail2(상세) 선언형 클라이언트(HTTP Interface, WebClient 백엔드).
- * 응답이 XML이라 WebClient에 JSON 디코더만 있는 상태에서는 문자열로 받는다 — 파싱은 {@link CultureApiMapper}가 XmlMapper로 담당한다.
+ * 한눈에보는문화정보(15138937) realm2(목록)·detail2(상세) 선언형 클라이언트(HTTP Interface, RestClient 백엔드).
+ * 응답이 XML이라 문자열로 받는다 — 파싱은 {@link CultureApiMapper}가 XmlMapper로 담당한다.
  */
 public interface CultureApi {
 

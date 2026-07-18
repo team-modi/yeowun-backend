@@ -38,7 +38,7 @@ public record CultureApiResponse(Header header, Body body) {
             String placeUrl, String placeAddr, String placeSeq) {}
 
     public boolean isSuccess() {
-        return header != null && "00".equals(header.resultCode());
+        return header != null && CultureResultCode.isSuccess(header.resultCode());
     }
 
     public List<Item> items() {
