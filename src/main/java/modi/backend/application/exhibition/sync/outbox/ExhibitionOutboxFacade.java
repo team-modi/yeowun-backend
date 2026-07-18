@@ -60,6 +60,7 @@ public class ExhibitionOutboxFacade {
 	@Transactional
 	public void enqueueAll(OutboxMessageType messageType, Collection<String> targetKeys, LocalDateTime now) {
 		for (String targetKey : targetKeys) {
+			// 자기호출이라 enqueue의 프록시 속성은 안 탄다 — 이 메서드가 이미 같은 @Transactional 경계라 무해하다.
 			enqueue(messageType, targetKey, now);
 		}
 	}

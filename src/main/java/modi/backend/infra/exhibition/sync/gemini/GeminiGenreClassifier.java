@@ -86,7 +86,7 @@ public class GeminiGenreClassifier implements GenreClassifier {
 		requireConfigured();
 		GeminiDto.Response response = call(buildBatchRequest(inputs));
 		List<String> genres = parseArray(response == null ? null : response.firstText());
-		if (genres == null || genres.size() < inputs.size()) {
+		if (genres == null || genres.size() != inputs.size()) {
 			count("invalid_batch_response");
 			throw new GenreClassificationException("Gemini 배치 응답이 입력 크기와 다름: "
 					+ (genres == null ? "파싱 실패" : genres.size() + "/" + inputs.size()));

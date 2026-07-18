@@ -96,6 +96,14 @@ public class ExhibitionDraftFacade {
 				.orElse(false);
 	}
 
+	/** 미종료 draft가 있는가 — 재전달 메시지가 승격 전 draft를 "대상 미존재"로 오판하지 않기 위한 판정. */
+	@Transactional(readOnly = true)
+	public boolean hasActiveDraft(String externalId) {
+		return exhibitionDraftRepository.findByExternalId(externalId)
+				.map(draft -> !draft.getStatus().isTerminal())
+				.orElse(false);
+	}
+
 	/** CLASSIFY_GENRE 핸들러의 draft 경로 판정 — 장르 스텝이 미해소인 draft의 분류 입력을 돌려준다(아니면 empty). */
 	@Transactional(readOnly = true)
 	public Optional<GenreClassification> resolveGenreInput(String externalId) {
@@ -117,9 +125,10 @@ public class ExhibitionDraftFacade {
 			return; // 재전달·경합 — 이미 해소됐거나 대상이 아니다.
 		}
 		draft.applyDetail(detail, now);
-		exhibitionDraftRepository.save(draft);
 		archiveDetailPayload(externalId, detail);
 		exhibitionOutboxFacade.enqueue(OutboxMessageType.CLASSIFY_GENRE, externalId, now);
+		promoteIfReady(draft, now);
+		exhibitionDraftRepository.save(draft);
 	}
 
 	/** 원천 무상세 확인(FETCH_DETAIL 해소) — 값 없이 스텝만 해소하고 다음 스텝(장르)을 건다. */
@@ -130,12 +139,13 @@ public class ExhibitionDraftFacade {
 			return;
 		}
 		draft.markDetailAbsent(now);
-		exhibitionDraftRepository.save(draft);
 		exhibitionOutboxFacade.enqueue(OutboxMessageType.CLASSIFY_GENRE, externalId, now);
+		promoteIfReady(draft, now);
+		exhibitionDraftRepository.save(draft);
 	}
 
 	/**
-	 * 장르 반영(CLASSIFY_GENRE 해소) + <b>승격</b> — 장르가 마지막 필수 스텝이라 게이트 검사가 여기서 일어난다.
+	 * 장르 반영(CLASSIFY_GENRE 해소) + 승격 검사 — 정상 체인에선 장르가 마지막 필수 스텝이라 대개 여기서 승격된다.
 	 * 게이트를 채우면 같은 트랜잭션에서 [전시장 resolve → 전시 생성 → 상세 satellite → 장르 정준행 →
 	 * 영업시간 재검증 enqueue → draft 종료]까지 완주한다(사용자 확정 승격 경계).
 	 */
@@ -146,10 +156,19 @@ public class ExhibitionDraftFacade {
 			return; // 재전달·경합 — 이미 분류됐거나 대상이 아니다.
 		}
 		draft.applyGenre(result, now);
+		promoteIfReady(draft, now);
+		exhibitionDraftRepository.save(draft);
+	}
+
+	/**
+	 * <b>모든 스텝 해소 지점</b>에서 게이트를 검사한다 — "마지막 스텝 = 장르" 순서 가정에 기대지 않는다.
+	 * 스텝이 역순으로 도착해도(예: 잔존 CLASSIFY_GENRE 메시지가 상세보다 먼저 처리) 마지막으로 해소된 스텝의
+	 * 트랜잭션이 승격을 완주하므로, 게이트를 다 채운 draft가 영구 ENRICHING으로 침묵하는 경로가 없다.
+	 */
+	private void promoteIfReady(ExhibitionDraft draft, LocalDateTime now) {
 		if (draft.isReadyForPromotion()) {
 			promote(draft, now);
 		}
-		exhibitionDraftRepository.save(draft);
 	}
 
 	/** 필수 스텝의 영구 실패(4xx·시도 소진) — draft를 FAILED로 종료해 운영자에게 보인다. */

@@ -93,7 +93,7 @@ public class ClaudeGenreClassifier implements GenreClassifier {
 		}
 		String text = complete(BATCH_SYSTEM_PROMPT.formatted(String.join(", ", GenreKeyword.all())), sb.toString());
 		List<String> genres = parseArray(text);
-		if (genres == null || genres.size() < inputs.size()) {
+		if (genres == null || genres.size() != inputs.size()) {
 			count("invalid_batch_response");
 			throw new GenreClassificationException("Claude 배치 응답이 입력 크기와 다름: "
 					+ (genres == null ? "파싱 실패" : genres.size() + "/" + inputs.size()));

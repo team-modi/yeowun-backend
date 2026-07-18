@@ -155,7 +155,10 @@ public class CatalogEnricher {
 			} catch (OptimisticLockingFailureException e) {
 				continue; // 반영 중 충돌 — 다른 워커가 처리(메시지는 그 워커가 마감한다).
 			} catch (RuntimeException e) {
-				if (OutboxProcessing.fail(exhibitionOutboxFacade, target.message(), OutboxFailures.classify(e),
+				// 장르는 PERMANENT로 굳히지 않는다(무기한 정책의 취지 — ADR-11). 반영 예외를 classify하면
+				// cause 체인의 IllegalArgumentException 등이 PERMANENT로 분류돼 draft가 조용히 영구 미승격으로
+				// 남는 비대칭이 생긴다(상세와 달리 장르엔 draft FAILED 연동이 없다) — RETRYABLE 고정으로 막는다.
+				if (OutboxProcessing.fail(exhibitionOutboxFacade, target.message(), OutboxFailureType.RETRYABLE,
 						OutboxFailures.describe(e), now)) {
 					transitioned++;
 				}

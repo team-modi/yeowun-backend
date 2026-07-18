@@ -74,6 +74,11 @@ public class DetailEnricher {
 		if (exhibitionDraftFacade.needsDetail(externalId)) {
 			return processDraft(message, externalId, now);
 		}
+		if (exhibitionDraftFacade.hasActiveDraft(externalId)) {
+			// 상세 스텝은 이미 해소된 미종료 draft(장르 대기 중) — 재전달 메시지를 "대상 미존재"로 오판해
+			// RETRYABLE을 반복하다 PERMANENT로 굳는 노이즈를 막고, 할 일 없음으로 마감한다.
+			return OutboxProcessing.succeed(exhibitionOutboxFacade, message, now);
+		}
 		return processExhibition(message, externalId, now);
 	}
 
