@@ -6,16 +6,15 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
-import org.springframework.http.client.reactive.ReactorClientHttpConnector;
-import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.support.WebClientAdapter;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.support.RestClientAdapter;
 import org.springframework.web.service.invoker.HttpServiceProxyFactory;
 
 import modi.backend.domain.exhibition.sync.port.PlaceHoursProvider;
 import modi.backend.infra.exhibition.sync.google.GoogleMapsApi;
 import modi.backend.infra.exhibition.sync.google.GooglePlaceHoursProvider;
 import modi.backend.infra.exhibition.sync.mock.MockPlaceHoursProvider;
-import reactor.netty.http.client.HttpClient;
 
 /**
  * 전시 영업시간(구글 Places New) 관련 빈 등록 — 장르(Gemini) 구성과 동형.
@@ -27,21 +26,21 @@ import reactor.netty.http.client.HttpClient;
 @EnableConfigurationProperties(PlaceHoursProperties.class)
 public class PlaceHoursConfig {
 
-	/** 구글 Places 전용 WebClient. baseUrl·응답 타임아웃(워커 스레드 장기 점유·부팅 지연 방지)을 설정에서 주입한다. */
+	/** 구글 Places 전용 RestClient. baseUrl·읽기 타임아웃(워커 스레드 장기 점유·부팅 지연 방지)을 설정에서 주입한다. */
 	@Bean
-	public WebClient googleMapsWebClient(PlaceHoursProperties properties) {
-		HttpClient httpClient = HttpClient.create()
-				.responseTimeout(Duration.ofSeconds(properties.timeoutSeconds()));
-		return WebClient.builder()
+	public RestClient googleMapsRestClient(PlaceHoursProperties properties) {
+		JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory();
+		requestFactory.setReadTimeout(Duration.ofSeconds(properties.timeoutSeconds()));
+		return RestClient.builder()
 				.baseUrl(properties.baseUrl())
-				.clientConnector(new ReactorClientHttpConnector(httpClient))
+				.requestFactory(requestFactory)
 				.build();
 	}
 
-	/** {@link GoogleMapsApi} 선언형 클라이언트 — {@link #googleMapsWebClient} 위에 HTTP Interface 프록시를 세운다. */
+	/** {@link GoogleMapsApi} 선언형 클라이언트 — {@link #googleMapsRestClient} 위에 HTTP Interface 프록시를 세운다. */
 	@Bean
-	public GoogleMapsApi googleMapsApi(WebClient googleMapsWebClient) {
-		return HttpServiceProxyFactory.builderFor(WebClientAdapter.create(googleMapsWebClient)).build()
+	public GoogleMapsApi googleMapsApi(RestClient googleMapsRestClient) {
+		return HttpServiceProxyFactory.builderFor(RestClientAdapter.create(googleMapsRestClient)).build()
 				.createClient(GoogleMapsApi.class);
 	}
 

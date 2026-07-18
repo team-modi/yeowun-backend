@@ -14,8 +14,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.support.WebClientAdapter;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.support.RestClientAdapter;
 import org.springframework.web.service.invoker.HttpServiceProxyFactory;
 
 import modi.backend.config.PublicDataProperties;
@@ -55,8 +55,14 @@ class CultureExhibitionClientTest {
 		server = new MockWebServer();
 		server.start();
 		String baseUrl = "http://localhost:" + server.getPort();
-		WebClient webClient = WebClient.builder().baseUrl(baseUrl).build();
-		CultureApi cultureApi = HttpServiceProxyFactory.builderFor(WebClientAdapter.create(webClient)).build()
+		// 운영 조립(HttpClientConfig)과 동일: JDK 팩토리 고정(클래스패스의 Apache 자동감지 → 전송 재시도 방지) + UTF-8 String 컨버터
+		RestClient restClient = RestClient.builder().baseUrl(baseUrl)
+				.requestFactory(new org.springframework.http.client.JdkClientHttpRequestFactory())
+				.configureMessageConverters(b -> b.withStringConverter(
+						new org.springframework.http.converter.StringHttpMessageConverter(
+								java.nio.charset.StandardCharsets.UTF_8)))
+				.build();
+		CultureApi cultureApi = HttpServiceProxyFactory.builderFor(RestClientAdapter.create(restClient)).build()
 				.createClient(CultureApi.class);
 		PublicDataProperties properties = new PublicDataProperties(baseUrl, "test-service-key", "D000", 100, 5, 15L);
 		client = new CultureExhibitionClient(cultureApi, new CultureApiMapper(), properties,

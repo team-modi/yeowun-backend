@@ -26,7 +26,7 @@ import modi.backend.domain.exhibition.hours.WeeklyOpeningHours;
  * 구글 Places(New) 실호출 영업시간 조회기. 장소명+주소로 Text Search 1콜을 보내 {@code regularOpeningHours}를 받고,
  * periods를 요일별 {@link WeeklyOpeningHours}로 파싱한다.
  * <p>
- * 계약({@link PlaceHoursProvider}): 미발견은 {@link Optional#empty()}, 전송 오류(WebClient 예외)는 전파해 상위가 스킵/재시도한다.
+ * 계약({@link PlaceHoursProvider}): 미발견은 {@link Optional#empty()}, 전송 오류(RestClient 예외)는 전파해 상위가 스킵/재시도한다.
  * 장소는 찾았으나 영업시간이 없으면 {@link WeeklyOpeningHours#empty()}를 담아 반환한다(장소 확인은 됐으므로 재조회 대상에서 빠지게).
  * 운영에서만 선택되며(mock 기본), 키 미설정 시엔 애초에 {@link MockPlaceHoursProvider}가 @Primary로 선택된다.
  */

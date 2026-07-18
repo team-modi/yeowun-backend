@@ -10,7 +10,7 @@ import org.springframework.web.service.annotation.GetExchange;
 import org.springframework.web.service.annotation.PostExchange;
 
 /**
- * 네이버 REST 엔드포인트 선언형 클라이언트(HTTP Interface, WebClient 백엔드).
+ * 네이버 REST 엔드포인트 선언형 클라이언트(HTTP Interface, RestClient 백엔드).
  * 토큰 교환은 redirect_uri 대신 state를 쓰고, userinfo는 {@code response} 아래 중첩 구조다.
  */
 public interface NaverApi {

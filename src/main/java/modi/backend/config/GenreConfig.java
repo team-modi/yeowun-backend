@@ -8,16 +8,15 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
-import org.springframework.http.client.reactive.ReactorClientHttpConnector;
-import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.support.WebClientAdapter;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.support.RestClientAdapter;
 import org.springframework.web.service.invoker.HttpServiceProxyFactory;
 
 import modi.backend.domain.exhibition.sync.port.GenreClassifier;
 import modi.backend.infra.exhibition.sync.gemini.GeminiApi;
 import modi.backend.infra.exhibition.sync.gemini.GeminiGenreClassifier;
 import modi.backend.infra.exhibition.sync.mock.RandomGenreClassifier;
-import reactor.netty.http.client.HttpClient;
 
 /**
  * 장르 분류 관련 빈 등록. Gemini 선언형 HTTP 클라이언트({@link GeminiApi})와, yml로 선택되는 주 분류기({@link GenreClassifier})를 조립한다.
@@ -30,24 +29,24 @@ import reactor.netty.http.client.HttpClient;
 public class GenreConfig {
 
 	/**
-	 * Gemini 전용 WebClient. baseUrl·응답 타임아웃(워커 스레드 장기 점유·부팅 지연 방지)을 설정에서 주입한다.
+	 * Gemini 전용 RestClient. baseUrl·읽기 타임아웃(워커 스레드 장기 점유·부팅 지연 방지)을 설정에서 주입한다.
 	 * 응답의 여분 필드(role·thoughtSignature·usageMetadata 등)는 {@code GeminiDto} 응답 record의
-	 * {@code @JsonIgnoreProperties(ignoreUnknown)}로 관대하게 파싱하므로 별도 코덱 커스터마이즈는 두지 않는다.
+	 * {@code @JsonIgnoreProperties(ignoreUnknown)}로 관대하게 파싱하므로 별도 컨버터 커스터마이즈는 두지 않는다.
 	 */
 	@Bean
-	public WebClient geminiWebClient(GeminiProperties properties) {
-		HttpClient httpClient = HttpClient.create()
-				.responseTimeout(Duration.ofSeconds(properties.timeoutSeconds()));
-		return WebClient.builder()
+	public RestClient geminiRestClient(GeminiProperties properties) {
+		JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory();
+		requestFactory.setReadTimeout(Duration.ofSeconds(properties.timeoutSeconds()));
+		return RestClient.builder()
 				.baseUrl(properties.baseUrl())
-				.clientConnector(new ReactorClientHttpConnector(httpClient))
+				.requestFactory(requestFactory)
 				.build();
 	}
 
-	/** {@link GeminiApi} 선언형 클라이언트 — {@link #geminiWebClient} 위에 HTTP Interface 프록시를 세운다. */
+	/** {@link GeminiApi} 선언형 클라이언트 — {@link #geminiRestClient} 위에 HTTP Interface 프록시를 세운다. */
 	@Bean
-	public GeminiApi geminiApi(WebClient geminiWebClient) {
-		return HttpServiceProxyFactory.builderFor(WebClientAdapter.create(geminiWebClient)).build()
+	public GeminiApi geminiApi(RestClient geminiRestClient) {
+		return HttpServiceProxyFactory.builderFor(RestClientAdapter.create(geminiRestClient)).build()
 				.createClient(GeminiApi.class);
 	}
 

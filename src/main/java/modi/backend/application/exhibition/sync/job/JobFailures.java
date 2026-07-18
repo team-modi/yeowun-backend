@@ -1,6 +1,6 @@
 package modi.backend.application.exhibition.sync.job;
 
-import org.springframework.web.reactive.function.client.WebClientResponseException;
+import org.springframework.web.client.RestClientResponseException;
 
 import modi.backend.domain.exhibition.enrichment.JobFailureType;
 
@@ -23,7 +23,7 @@ public final class JobFailures {
 
 	public static JobFailureType classify(Throwable error) {
 		for (Throwable t = error; t != null; t = t.getCause()) {
-			if (t instanceof WebClientResponseException web) {
+			if (t instanceof RestClientResponseException web) {
 				int status = web.getStatusCode().value();
 				boolean permanent = status >= 400 && status < 500 && status != 429;
 				return permanent ? JobFailureType.PERMANENT : JobFailureType.RETRYABLE;
