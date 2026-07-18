@@ -28,13 +28,13 @@ import modi.backend.domain.exhibition.catalog.ExhibitionPlace;
 import modi.backend.domain.exhibition.catalog.ExhibitionPlaceRepository;
 import modi.backend.domain.exhibition.catalog.ExhibitionRegion;
 import modi.backend.domain.exhibition.hours.PlaceHours;
-import modi.backend.domain.exhibition.hours.PlaceHoursData;
-import modi.backend.domain.exhibition.hours.PlaceHoursProvider;
+import modi.backend.domain.exhibition.sync.PlaceHoursData;
+import modi.backend.domain.exhibition.sync.PlaceHoursProvider;
 import modi.backend.infra.exhibition.hours.PlaceHoursJpaRepository;
 import modi.backend.domain.exhibition.hours.PlaceHoursStatus;
 import modi.backend.domain.exhibition.hours.PlaceHoursVendor;
 import modi.backend.domain.exhibition.hours.WeeklyOpeningHours;
-import modi.backend.infra.exhibition.hours.GooglePlaceResponseJpaRepository;
+import modi.backend.infra.exhibition.sync.GooglePlaceResponseJpaRepository;
 
 /**
  * 전시 영업시간 보강 전 경로 통합 검증(@SpringBootTest + Testcontainers-MySQL). 외부 조회기({@link PlaceHoursProvider})만 목으로 두고

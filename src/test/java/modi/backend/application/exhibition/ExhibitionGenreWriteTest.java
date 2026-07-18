@@ -24,10 +24,10 @@ import modi.backend.domain.exhibition.catalog.ExhibitionGenre;
 import modi.backend.infra.exhibition.catalog.ExhibitionGenreJpaRepository;
 import modi.backend.domain.exhibition.catalog.ExhibitionRegion;
 import modi.backend.domain.exhibition.catalog.ExhibitionRepository;
-import modi.backend.domain.exhibition.genre.GenreClassification;
+import modi.backend.domain.exhibition.sync.GenreClassification;
 import modi.backend.domain.exhibition.genre.GenreKeyword;
 import modi.backend.domain.exhibition.genre.GenreProvider;
-import modi.backend.domain.exhibition.genre.GenreResult;
+import modi.backend.domain.exhibition.sync.GenreResult;
 
 /**
  * 장르 <b>쓰기</b> 검증(@SpringBootTest + Testcontainers-MySQL).

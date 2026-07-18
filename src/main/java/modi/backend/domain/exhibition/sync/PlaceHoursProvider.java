@@ -1,4 +1,6 @@
-package modi.backend.domain.exhibition.hours;
+package modi.backend.domain.exhibition.sync;
+
+import modi.backend.domain.exhibition.hours.PlaceHoursVendor;
 
 import java.util.Optional;
 

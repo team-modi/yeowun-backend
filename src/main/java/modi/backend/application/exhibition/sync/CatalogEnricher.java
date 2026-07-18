@@ -14,10 +14,10 @@ import lombok.RequiredArgsConstructor;
 import modi.backend.config.CatalogEnrichProperties;
 import modi.backend.config.GenreProperties;
 import modi.backend.domain.exhibition.enrichment.EnrichmentJob;
-import modi.backend.domain.exhibition.genre.GenreClassification;
-import modi.backend.domain.exhibition.genre.GenreClassifier;
+import modi.backend.domain.exhibition.sync.GenreClassification;
+import modi.backend.domain.exhibition.sync.GenreClassifier;
 import modi.backend.domain.exhibition.genre.GenreProvider;
-import modi.backend.domain.exhibition.genre.GenreResult;
+import modi.backend.domain.exhibition.sync.GenreResult;
 import modi.backend.domain.exhibition.enrichment.JobFailureType;
 import modi.backend.domain.exhibition.enrichment.JobType;
 

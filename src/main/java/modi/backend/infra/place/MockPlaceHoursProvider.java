@@ -6,8 +6,8 @@ import java.util.Optional;
 
 import org.springframework.stereotype.Component;
 
-import modi.backend.domain.exhibition.hours.PlaceHoursData;
-import modi.backend.domain.exhibition.hours.PlaceHoursProvider;
+import modi.backend.domain.exhibition.sync.PlaceHoursData;
+import modi.backend.domain.exhibition.sync.PlaceHoursProvider;
 import modi.backend.domain.exhibition.hours.PlaceHoursVendor;
 import modi.backend.domain.exhibition.hours.WeeklyOpeningHours;
 

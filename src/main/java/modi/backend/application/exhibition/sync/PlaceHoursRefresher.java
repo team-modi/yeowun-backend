@@ -13,8 +13,8 @@ import modi.backend.config.EnrichmentProperties;
 import modi.backend.domain.exhibition.enrichment.EnrichmentJob;
 import modi.backend.domain.exhibition.enrichment.JobType;
 import modi.backend.domain.exhibition.hours.OpeningHoursFormatter;
-import modi.backend.domain.exhibition.hours.PlaceHoursData;
-import modi.backend.domain.exhibition.hours.PlaceHoursProvider;
+import modi.backend.domain.exhibition.sync.PlaceHoursData;
+import modi.backend.domain.exhibition.sync.PlaceHoursProvider;
 
 /**
  * 이벤트 구동 영업시간 재검증 처리기(설계 §4-1) — 통합 작업큐의 영업시간 작업

@@ -1,4 +1,6 @@
-package modi.backend.domain.exhibition.genre;
+package modi.backend.domain.exhibition.sync;
+
+import modi.backend.domain.exhibition.genre.GenreProvider;
 
 /**
  * 장르 분류 결과 + 계보(어느 출처가·어느 모델이 만들었나).

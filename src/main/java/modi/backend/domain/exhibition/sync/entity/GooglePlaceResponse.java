@@ -1,4 +1,4 @@
-package modi.backend.domain.exhibition.hours;
+package modi.backend.domain.exhibition.sync.entity;
 
 import java.time.LocalDateTime;
 

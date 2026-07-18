@@ -1,4 +1,6 @@
-package modi.backend.domain.exhibition.hours;
+package modi.backend.domain.exhibition.sync;
+
+import modi.backend.domain.exhibition.hours.WeeklyOpeningHours;
 
 /**
  * 한 장소의 영업시간 조회 결과(도메인 포트 출력). 인프라(구글/mock)와 애플리케이션 사이 경계 DTO —

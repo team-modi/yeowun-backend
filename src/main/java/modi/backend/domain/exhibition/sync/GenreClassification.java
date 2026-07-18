@@ -1,4 +1,4 @@
-package modi.backend.domain.exhibition.genre;
+package modi.backend.domain.exhibition.sync;
 
 import modi.backend.domain.exhibition.catalog.Exhibition;
 

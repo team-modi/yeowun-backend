@@ -1,4 +1,4 @@
-package modi.backend.domain.exhibition.genre;
+package modi.backend.domain.exhibition.sync;
 
 import java.util.List;
 
