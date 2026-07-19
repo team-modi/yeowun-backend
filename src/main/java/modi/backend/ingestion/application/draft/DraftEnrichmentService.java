@@ -6,10 +6,10 @@ import java.util.Optional;
 import org.springframework.stereotype.Service;
 
 import lombok.RequiredArgsConstructor;
-import modi.backend.domain.exhibition.catalog.CatalogDetailData;
 import modi.backend.domain.exhibition.genre.GenreClassification;
 import modi.backend.domain.exhibition.genre.GenreClassifier;
 import modi.backend.domain.exhibition.genre.GenreResult;
+import modi.backend.ingestion.domain.data.DetailFetch;
 import modi.backend.ingestion.domain.draft.DraftStep;
 import modi.backend.ingestion.domain.port.ExhibitionCatalogClient;
 
@@ -41,8 +41,8 @@ public class DraftEnrichmentService {
 		if (!exhibitionDraftFacade.needsDetail(externalId)) {                            // ① 판정(tx)
 			return false;
 		}
-		Optional<CatalogDetailData> detail = catalogClient.fetchDetail(externalId);      // ② 외부 호출(tx 밖)
-		detail.ifPresentOrElse(d -> exhibitionDraftFacade.applyDetail(externalId, d, now), // ③ 반영(tx)
+		Optional<DetailFetch> detail = catalogClient.fetchDetailSnapshot(externalId);    // ② 외부 호출(tx 밖)
+		detail.ifPresentOrElse(f -> exhibitionDraftFacade.applyDetail(externalId, f.data(), f.vendor(), now), // ③ 반영(tx)
 				() -> exhibitionDraftFacade.markDetailAbsent(externalId, now));
 		return true;
 	}

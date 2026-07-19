@@ -16,6 +16,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
+import modi.backend.ingestion.domain.data.DetailFetch;
 import modi.backend.TestcontainersConfiguration;
 import modi.backend.ingestion.application.draft.ExhibitionDraftFacade;
 import modi.backend.ingestion.application.enricher.GenreEnricher;
@@ -89,8 +90,8 @@ class ExhibitionDraftPipelineIntegrationTest {
 		String externalId = "PIPE-" + seq;
 		given(catalogClient.fetchAll()).willReturn(
 				new CatalogListData(java.util.List.of(listData(externalId, "파이프장소" + seq)), 1, false));
-		given(catalogClient.fetchDetail(anyString())).willReturn(Optional.of(
-				new CatalogDetailData("무료", "전시 소개", null, "02-000-0000", null, null, "서울시 종로구", null, null)));
+		given(catalogClient.fetchDetailSnapshot(anyString())).willReturn(Optional.of(new DetailFetch(
+				new CatalogDetailData("무료", "전시 소개", null, "02-000-0000", null, null, "서울시 종로구", null), null)));
 
 		// 1) sync — 목록 외 외부 호출 0: draft 스테이징 + FETCH_DETAIL enqueue만.
 		int staged = catalogSynchronizer.syncCatalog();
@@ -132,7 +133,7 @@ class ExhibitionDraftPipelineIntegrationTest {
 		String externalId = "PIPE-ABSENT-" + seq;
 		given(catalogClient.fetchAll()).willReturn(
 				new CatalogListData(java.util.List.of(listData(externalId, "무상세장소" + seq)), 1, false));
-		given(catalogClient.fetchDetail(anyString())).willReturn(Optional.empty()); // 원천에 상세 없음
+		given(catalogClient.fetchDetailSnapshot(anyString())).willReturn(Optional.empty()); // 원천에 상세 없음
 
 		catalogSynchronizer.syncCatalog();
 		detailEnricher.enrichDetails();

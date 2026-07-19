@@ -103,7 +103,7 @@ class ExhibitionSyncAtomicityIntegrationTest {
 
 		exhibitionDraftFacade.stageFromList(listData(externalId, placeName), now);
 		exhibitionDraftFacade.applyDetail(externalId,
-				new CatalogDetailData("무료", "전시 소개", null, "02-000-0000", null, null, "서울시 종로구", null, null), now);
+				new CatalogDetailData("무료", "전시 소개", null, "02-000-0000", null, null, "서울시 종로구", null), null, now);
 		exhibitionDraftFacade.applyGenre(externalId,
 				GenreResult.ai("사진", GenreProvider.GEMINI, "gemini-2.5-flash"), now);
 

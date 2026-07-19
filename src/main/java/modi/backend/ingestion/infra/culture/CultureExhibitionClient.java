@@ -15,11 +15,12 @@ import modi.backend.ingestion.config.PublicDataProperties;
 import modi.backend.domain.exhibition.catalog.CatalogDetailData;
 import modi.backend.ingestion.domain.data.CatalogExhibitionData;
 import modi.backend.ingestion.domain.data.CatalogListData;
+import modi.backend.ingestion.domain.data.DetailFetch;
 import modi.backend.ingestion.domain.port.ExhibitionCatalogClient;
 import modi.backend.domain.exhibition.catalog.ExhibitionErrorCode;
 import modi.backend.ingestion.domain.ExternalApi;
-import modi.backend.ingestion.domain.entity.ExternalApiCall;
-import modi.backend.ingestion.domain.port.ExternalApiCallRepository;
+import modi.backend.ingestion.domain.entity.ExternalApiCallLog;
+import modi.backend.ingestion.domain.port.ExternalApiCallLogRepository;
 import modi.backend.ingestion.domain.ExternalApiOutcome;
 import modi.backend.support.error.CoreException;
 
@@ -44,7 +45,7 @@ public class CultureExhibitionClient implements ExhibitionCatalogClient {
 	private final CultureApiMapper mapper;
 	private final PublicDataProperties properties;
 	/** 외부 호출 감사(append-only) — 문화포털은 무료라 billable=false. */
-	private final ExternalApiCallRepository externalApiCallRepository;
+	private final ExternalApiCallLogRepository externalApiCallRepository;
 
 	@Override
 	public CatalogListData fetchAll() {
@@ -67,7 +68,7 @@ public class CultureExhibitionClient implements ExhibitionCatalogClient {
 			seen += items.size();
 			// 원본(payload)은 아이템 객체에서 바로 직렬화한다 — 응답 문자열을 잘라 인덱스로 짝지을 필요가 없으므로
 			// "A 전시의 원본이 B에 붙는" 오염이 원인부터 불가능하다.
-			items.stream().map(item -> mapper.toCatalog(item, mapper.payloadOf(item)))
+			items.stream().map(mapper::toCatalog)
 					.filter(CatalogExhibitionData::isPersistable).forEach(collected::add);
 			if (items.size() < properties.numOfRows()) {
 				exhaustedPages = false;
@@ -98,16 +99,16 @@ public class CultureExhibitionClient implements ExhibitionCatalogClient {
 			String xml = request("/realm2", () -> cultureApi.getRealmList(
 					properties.serviceKey(), page, properties.numOfRows(), properties.realmCode()));
 			CultureApiResponse response = mapper.parse(xml);
-			record(ExternalApiCall.free(ExternalApi.CULTURE_LIST, requestKey, ExternalApiOutcome.SUCCESS, calledAt));
+			record(ExternalApiCallLog.free(ExternalApi.CULTURE_LIST, requestKey, ExternalApiOutcome.SUCCESS, calledAt));
 			return response;
 		} catch (RuntimeException e) {
-			record(ExternalApiCall.free(ExternalApi.CULTURE_LIST, requestKey, ExternalApiOutcome.FAILED, calledAt));
+			record(ExternalApiCallLog.free(ExternalApi.CULTURE_LIST, requestKey, ExternalApiOutcome.FAILED, calledAt));
 			throw e;
 		}
 	}
 
 	@Override
-	public Optional<CatalogDetailData> fetchDetail(String externalId) {
+	public Optional<DetailFetch> fetchDetailSnapshot(String externalId) {
 		if (!properties.isConfigured()) {
 			return Optional.empty();
 		}
@@ -117,21 +118,21 @@ public class CultureExhibitionClient implements ExhibitionCatalogClient {
 			List<CultureApiResponse.Item> items = mapper.parse(xml).items();
 			if (items.isEmpty()) {
 				// 호출은 정상인데 원천에 상세가 없다 — 실패가 아니라 원천의 사실이다(재조회해도 소용없다).
-				record(ExternalApiCall.free(ExternalApi.CULTURE_DETAIL, externalId, ExternalApiOutcome.NO_DATA,
+				record(ExternalApiCallLog.free(ExternalApi.CULTURE_DETAIL, externalId, ExternalApiOutcome.NO_DATA,
 						calledAt));
 				return Optional.empty();
 			}
-			record(ExternalApiCall.free(ExternalApi.CULTURE_DETAIL, externalId, ExternalApiOutcome.SUCCESS, calledAt));
+			record(ExternalApiCallLog.free(ExternalApi.CULTURE_DETAIL, externalId, ExternalApiOutcome.SUCCESS, calledAt));
 			CultureApiResponse.Item item = items.get(0);
-			return Optional.of(mapper.toDetail(item, mapper.payloadOf(item)));
+			return Optional.of(new DetailFetch(mapper.toDetail(item), mapper.vendorOf(item)));
 		} catch (RuntimeException e) {
-			record(ExternalApiCall.free(ExternalApi.CULTURE_DETAIL, externalId, ExternalApiOutcome.FAILED, calledAt));
+			record(ExternalApiCallLog.free(ExternalApi.CULTURE_DETAIL, externalId, ExternalApiOutcome.FAILED, calledAt));
 			throw e;
 		}
 	}
 
 	/** 감사 기록은 부가 기능이다 — 여기서 실패해도 수집·적재를 깨지 않는다. */
-	private void record(ExternalApiCall call) {
+	private void record(ExternalApiCallLog call) {
 		try {
 			externalApiCallRepository.save(call);
 		} catch (RuntimeException e) {

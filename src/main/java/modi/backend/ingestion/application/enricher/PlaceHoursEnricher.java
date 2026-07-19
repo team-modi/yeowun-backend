@@ -15,8 +15,8 @@ import org.springframework.stereotype.Component;
 import lombok.RequiredArgsConstructor;
 import modi.backend.ingestion.config.PlaceHoursProperties;
 import modi.backend.domain.exhibition.hours.OpeningHoursFormatter;
-import modi.backend.domain.exhibition.hours.PlaceHoursData;
-import modi.backend.domain.exhibition.hours.PlaceHoursProvider;
+import modi.backend.ingestion.domain.data.PlaceHoursFetch;
+import modi.backend.ingestion.domain.port.PlaceHoursProvider;
 
 /**
  * 전시 영업시간(운영시간) 보강 오케스트레이션 — 장르 보강({@link GenreEnricher})과 동형.
@@ -60,9 +60,10 @@ public class PlaceHoursEnricher {
 		int touched = 0;
 		for (PlaceHoursTarget target : targets) {
 			try {
-				Optional<PlaceHoursData> data = placeHoursProvider.fetch(target.placeName(), target.placeAddr());
-				String formatted = data.map(d -> openingHoursFormatter.format(d.weeklyHours())).orElse(null);
-				exhibitionSyncFacade.applyVenueHours(target, data.orElse(null), formatted, placeHoursProvider.vendor(),
+				Optional<PlaceHoursFetch> fetched = placeHoursProvider.fetch(target.placeName(), target.placeAddr());
+				String formatted = fetched.map(f -> openingHoursFormatter.format(f.data().weeklyHours())).orElse(null);
+				exhibitionSyncFacade.applyVenueHours(target, fetched.map(PlaceHoursFetch::data).orElse(null),
+						fetched.map(PlaceHoursFetch::vendor).orElse(null), formatted, placeHoursProvider.vendor(),
 						LocalDateTime.now());
 				touched += 1;
 			} catch (RuntimeException e) {

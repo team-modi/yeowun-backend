@@ -17,7 +17,7 @@ import modi.backend.ingestion.domain.ExternalApi;
 import modi.backend.ingestion.domain.ExternalApiOutcome;
 
 /**
- * 외부 호출 감사(append-only) — {@code external_api_call} 매핑.
+ * 외부 호출 감사(append-only) — {@code external_api_call_log} 매핑.
  *
  * <p><b>벤더가 늘어도 이 테이블 하나다.</b> 문화포털·Gemini·구글이 각자 다른 어휘를 쓰지만 "언제 무엇을 불렀고
  * 어떻게 끝났고 돈이 나갔나"는 공통이라, 처음부터 벤더·모델 불문으로 설계됐다(ERD 3장). 카카오·Claude가 와도
@@ -30,10 +30,10 @@ import modi.backend.ingestion.domain.ExternalApiOutcome;
  * 그래서 재시도 3회는 3행이 되고, 그게 정확한 사실이다(과금·한도는 시도 횟수로 발생한다).
  */
 @Entity
-@Table(name = "external_api_call")
+@Table(name = "external_api_call_log")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class ExternalApiCall {
+public class ExternalApiCallLog {
 
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -62,7 +62,7 @@ public class ExternalApiCall {
 	@Column(name = "called_at")
 	private LocalDateTime calledAt;
 
-	private ExternalApiCall(ExternalApi api, String model, String requestKey, ExternalApiOutcome outcome,
+	private ExternalApiCallLog(ExternalApi api, String model, String requestKey, ExternalApiOutcome outcome,
 			boolean billable, LocalDateTime calledAt) {
 		this.api = api;
 		this.model = model;
@@ -73,20 +73,20 @@ public class ExternalApiCall {
 	}
 
 	/** 무료 호출 1건(문화포털·Gemini 무료 한도). */
-	public static ExternalApiCall free(ExternalApi api, String requestKey, ExternalApiOutcome outcome,
+	public static ExternalApiCallLog free(ExternalApi api, String requestKey, ExternalApiOutcome outcome,
 			LocalDateTime calledAt) {
-		return new ExternalApiCall(api, null, requestKey, outcome, false, calledAt);
+		return new ExternalApiCallLog(api, null, requestKey, outcome, false, calledAt);
 	}
 
 	/** AI 호출 1건 — 요청 모델을 함께 남긴다(모델별 호출량·429 비율 집계용). */
-	public static ExternalApiCall ai(ExternalApi api, String model, ExternalApiOutcome outcome,
+	public static ExternalApiCallLog ai(ExternalApi api, String model, ExternalApiOutcome outcome,
 			LocalDateTime calledAt) {
-		return new ExternalApiCall(api, model, null, outcome, false, calledAt);
+		return new ExternalApiCallLog(api, model, null, outcome, false, calledAt);
 	}
 
 	/** 유료 호출 1건(구글 Places). */
-	public static ExternalApiCall billable(ExternalApi api, String requestKey, ExternalApiOutcome outcome,
+	public static ExternalApiCallLog billable(ExternalApi api, String requestKey, ExternalApiOutcome outcome,
 			LocalDateTime calledAt) {
-		return new ExternalApiCall(api, null, requestKey, outcome, true, calledAt);
+		return new ExternalApiCallLog(api, null, requestKey, outcome, true, calledAt);
 	}
 }

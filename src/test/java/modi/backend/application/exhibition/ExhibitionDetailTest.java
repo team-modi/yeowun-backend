@@ -81,7 +81,7 @@ class ExhibitionDetailTest {
 		given(exhibitionRepository.findById(1L)).willReturn(Optional.of(e));
 		given(exhibitionRepository.hasDetail(1L)).willReturn(false).willReturn(true);
 		given(catalogClient.fetchDetail("S1"))
-				.willReturn(Optional.of(new CatalogDetailData("무료", null, null, null, null, null, "주소", null, null)));
+				.willReturn(Optional.of(new CatalogDetailData("무료", null, null, null, null, null, "주소", null)));
 
 		facade.getDetail(new ExhibitionCriteria.Detail(1L, null));
 

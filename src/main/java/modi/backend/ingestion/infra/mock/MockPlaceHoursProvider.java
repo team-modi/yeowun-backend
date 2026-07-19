@@ -9,7 +9,8 @@ import java.util.Optional;
 import org.springframework.stereotype.Component;
 
 import modi.backend.domain.exhibition.hours.PlaceHoursData;
-import modi.backend.domain.exhibition.hours.PlaceHoursProvider;
+import modi.backend.ingestion.domain.data.PlaceHoursFetch;
+import modi.backend.ingestion.domain.port.PlaceHoursProvider;
 import modi.backend.domain.exhibition.hours.PlaceHoursVendor;
 import modi.backend.domain.exhibition.hours.WeeklyOpeningHours;
 
@@ -28,14 +29,15 @@ public class MockPlaceHoursProvider implements PlaceHoursProvider {
 	private static final LocalTime CLOSE = LocalTime.of(18, 0);
 
 	@Override
-	public Optional<PlaceHoursData> fetch(String placeName, String placeAddr) {
+	public Optional<PlaceHoursFetch> fetch(String placeName, String placeAddr) {
 		WeeklyOpeningHours.Builder builder = WeeklyOpeningHours.builder();
 		// 월요일(MONDAY)은 넣지 않아 휴무. 화~일 동일 시간.
 		for (DayOfWeek day : new DayOfWeek[] { DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY, DayOfWeek.THURSDAY,
 				DayOfWeek.FRIDAY, DayOfWeek.SATURDAY, DayOfWeek.SUNDAY }) {
 			builder.add(day, OPEN, CLOSE);
 		}
-		return Optional.of(new PlaceHoursData(builder.build(), "{\"mock\":true}"));
+		// mock은 벤더 원문이 없다(vendor=null) — 스냅샷은 비고 정준층에 provider=MOCK으로만 남는다.
+		return Optional.of(new PlaceHoursFetch(new PlaceHoursData(builder.build()), null));
 	}
 
 	/**

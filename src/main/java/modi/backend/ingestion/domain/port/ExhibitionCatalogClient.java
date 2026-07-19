@@ -1,6 +1,9 @@
 package modi.backend.ingestion.domain.port;
 
+import java.util.Optional;
+
 import modi.backend.ingestion.domain.data.CatalogListData;
+import modi.backend.ingestion.domain.data.DetailFetch;
 
 import modi.backend.domain.exhibition.catalog.ExhibitionDetailClient;
 import modi.backend.domain.exhibition.catalog.ExhibitionErrorCode;
@@ -20,4 +23,15 @@ public interface ExhibitionCatalogClient extends ExhibitionDetailClient {
 	 */
 	CatalogListData fetchAll();
 
+	/**
+	 * 단건 상세(detail2)를 벤더 원문과 함께 조회한다(수집 경로 — 도메인 반영과 스냅샷 적재가 같은 응답에서 나온다).
+	 * 인증키 미설정/결과 없음은 빈 Optional.
+	 */
+	Optional<DetailFetch> fetchDetailSnapshot(String externalId);
+
+	/** 코어 지연 상세 조회({@code ExhibitionDetailClient}) — 수집 조회에서 도메인 값만 취한다. */
+	@Override
+	default Optional<modi.backend.domain.exhibition.catalog.CatalogDetailData> fetchDetail(String externalId) {
+		return fetchDetailSnapshot(externalId).map(DetailFetch::data);
+	}
 }

@@ -32,7 +32,7 @@ class ExhibitionDraftTest {
 	}
 
 	private static CatalogDetailData detail() {
-		return new CatalogDetailData("무료", "설명", null, "02-000-0000", null, null, "서울시 종로구", null, null);
+		return new CatalogDetailData("무료", "설명", null, "02-000-0000", null, null, "서울시 종로구", null);
 	}
 
 	private static GenreResult genre() {
@@ -61,7 +61,7 @@ class ExhibitionDraftTest {
 		assertThat(draft.getPrice()).isEqualTo("무료");
 
 		// 재전달(at-least-once) — 값이 덮이지 않는다.
-		draft.applyDetail(new CatalogDetailData("50,000원", "다른 설명", null, null, null, null, null, null, null), NOW);
+		draft.applyDetail(new CatalogDetailData("50,000원", "다른 설명", null, null, null, null, null, null), NOW);
 		assertThat(draft.getPrice()).isEqualTo("무료");
 
 		draft.applyGenre(genre(), NOW);

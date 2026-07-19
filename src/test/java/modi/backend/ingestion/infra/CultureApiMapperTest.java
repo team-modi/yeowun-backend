@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 
 import modi.backend.domain.exhibition.catalog.CatalogDetailData;
 import modi.backend.ingestion.domain.data.CatalogExhibitionData;
+import modi.backend.ingestion.domain.data.CatalogVendorItem;
 import modi.backend.domain.exhibition.catalog.ExhibitionRegion;
 import modi.backend.support.error.CoreException;
 
@@ -98,49 +99,56 @@ class CultureApiMapperTest {
 	}
 
 	@Test
-	@DisplayName("payloadOf — 응답 아이템이 준 필드를 빠짐없이 JSON으로 직렬화한다(실측 기준 무손실)")
-	void payloadOf_전필드_직렬화() {
+	@DisplayName("vendorOf — 응답 아이템이 준 필드를 빠짐없이 원문 verbatim으로 옮긴다(실측 기준 무손실 — ADR-13)")
+	void vendorOf_전필드_원문() {
 		CultureApiResponse.Item item = mapper.parse(REALM2_XML).items().get(0);
 
-		String payload = mapper.payloadOf(item);
+		CatalogVendorItem vendor = mapper.vendorOf(item);
 
-		// 실측(realm2 12필드)이 확정한 목록 응답의 전 필드가 payload에 남아야 한다 — 하나라도 빠지면 재파싱 원료가 아니다.
-		assertThat(payload).contains("\"seq\":\"319005\"").contains("\"title\":\"패트릭 블랑\"")
-				.contains("\"startDate\":\"20180616\"").contains("\"endDate\":\"20281231\"")
-				.contains("\"place\":\"부산현대미술관\"").contains("\"realmName\":\"전시\"")
-				.contains("\"area\":\"부산\"").contains("\"sigungu\":\"사하구\"")
-				.contains("\"thumbnail\":\"http://t/x.jpg\"").contains("\"gpsX\":\"128.9\"")
-				.contains("\"gpsY\":\"35.1\"").contains("\"serviceName\":\"전시\"");
+		// 실측(realm2 12필드)이 확정한 목록 응답의 전 필드가 스냅샷 어휘에 남아야 한다 — 하나라도 빠지면 재가공 원료가 아니다.
+		assertThat(vendor.seq()).isEqualTo("319005");
+		assertThat(vendor.title()).isEqualTo("패트릭 블랑");
+		assertThat(vendor.startDate()).isEqualTo("20180616");
+		assertThat(vendor.endDate()).isEqualTo("20281231");
+		assertThat(vendor.place()).isEqualTo("부산현대미술관");
+		assertThat(vendor.realmName()).isEqualTo("전시");
+		assertThat(vendor.area()).isEqualTo("부산");
+		assertThat(vendor.sigungu()).isEqualTo("사하구");
+		assertThat(vendor.thumbnail()).isEqualTo("http://t/x.jpg");
+		assertThat(vendor.gpsX()).isEqualTo("128.9");
+		assertThat(vendor.gpsY()).isEqualTo("35.1");
+		assertThat(vendor.serviceName()).isEqualTo("전시");
 	}
 
 	@Test
-	@DisplayName("payloadOf — 원천이 주지 않은 필드는 싣지 않는다(안 준 것과 빈 값을 뒤섞지 않는다)")
-	void payloadOf_결측필드_제외() {
+	@DisplayName("vendorOf — 원천이 주지 않은 필드는 null(안 준 것이 그대로 보인다)")
+	void vendorOf_결측필드_null() {
 		CultureApiResponse.Item item = mapper.parse(REALM2_XML).items().get(0);
 
-		String payload = mapper.payloadOf(item);
+		CatalogVendorItem vendor = mapper.vendorOf(item);
 
-		// 목록 응답엔 상세 필드가 없다 — null로 채워 넣으면 payload만 비대해지고 "원천이 뭘 줬나"가 흐려진다.
-		assertThat(payload).doesNotContain("\"price\"").doesNotContain("\"contents1\"")
-				.doesNotContain("\"placeAddr\"");
+		// 목록 응답엔 상세 필드가 없다 — 컬럼 null = "원천이 안 줬다"(ADR-13 수용 단순화).
+		assertThat(vendor.price()).isNull();
+		assertThat(vendor.contents()).isNull();
+		assertThat(vendor.placeAddr()).isNull();
 	}
 
 	@Test
-	@DisplayName("payloadOf — 상세의 워드프레스 HTML 본문을 도메인 변환 전 원문 그대로 보존한다(재추출 원료)")
-	void payloadOf_HTML원문_보존() {
+	@DisplayName("vendorOf — 상세의 워드프레스 HTML 본문을 도메인 변환 전 원문 그대로 보존한다(재추출 원료)")
+	void vendorOf_HTML원문_보존() {
 		CultureApiResponse.Item item = mapper.parse(DETAIL2_WORDPRESS_XML).items().get(0);
 
-		String payload = mapper.payloadOf(item);
+		CatalogVendorItem vendor = mapper.vendorOf(item);
 
-		// 평문 추출은 toDetail의 몫이고, payload엔 그 이전 원문이 남아야 한다 — 규칙이 바뀌면 여기서 다시 뽑는다.
-		assertThat(payload).contains("wp:paragraph");
-		assertThat(mapper.toDetail(item, payload).description()).doesNotContain("wp:paragraph"); // 도메인 값은 평문
+		// 평문 추출은 toDetail의 몫이고, 스냅샷 어휘엔 그 이전 원문이 남아야 한다 — 규칙이 바뀌면 여기서 다시 뽑는다.
+		assertThat(vendor.contents()).contains("wp:paragraph");
+		assertThat(mapper.toDetail(item).description()).doesNotContain("wp:paragraph"); // 도메인 값은 평문
 	}
 
 	@Test
-	@DisplayName("payloadOf — 아이템이 없으면 null(적재를 건너뛴다)")
-	void payloadOf_없으면_null() {
-		assertThat(mapper.payloadOf(null)).isNull();
+	@DisplayName("vendorOf — 아이템이 없으면 null(적재를 건너뛴다)")
+	void vendorOf_없으면_null() {
+		assertThat(mapper.vendorOf(null)).isNull();
 	}
 
 	@Test
@@ -148,7 +156,7 @@ class CultureApiMapperTest {
 	void toCatalog_매핑() {
 		CultureApiResponse.Item item = mapper.parse(REALM2_XML).items().get(0);
 
-		CatalogExhibitionData data = mapper.toCatalog(item, null);
+		CatalogExhibitionData data = mapper.toCatalog(item);
 
 		assertThat(data.externalId()).isEqualTo("319005");
 		assertThat(data.region()).isEqualTo(ExhibitionRegion.BUSAN);
@@ -163,7 +171,7 @@ class CultureApiMapperTest {
 	void toDetail_매핑() {
 		CultureApiResponse.Item item = mapper.parse(DETAIL2_XML).items().get(0);
 
-		CatalogDetailData detail = mapper.toDetail(item, null);
+		CatalogDetailData detail = mapper.toDetail(item);
 
 		assertThat(detail.price()).isEqualTo("무료");
 		assertThat(detail.placeAddr()).isEqualTo("부산광역시 사하구 낙동남로 1191");
@@ -175,7 +183,7 @@ class CultureApiMapperTest {
 	void toCatalog_HTML_엔티티_디코딩() {
 		CultureApiResponse.Item item = mapper.parse(REALM2_ESCAPED_XML).items().get(0);
 
-		CatalogExhibitionData data = mapper.toCatalog(item, null);
+		CatalogExhibitionData data = mapper.toCatalog(item);
 
 		assertThat(data.title()).isEqualTo("이사라 <A Girl From Wonderland>");
 		assertThat(data.place()).isEqualTo("서울 & 경기 전시관");
@@ -186,7 +194,7 @@ class CultureApiMapperTest {
 	void toDetail_HTML_엔티티_디코딩() {
 		CultureApiResponse.Item item = mapper.parse(DETAIL2_ESCAPED_XML).items().get(0);
 
-		CatalogDetailData detail = mapper.toDetail(item, null);
+		CatalogDetailData detail = mapper.toDetail(item);
 
 		assertThat(detail.description()).isEqualTo("첫째 줄입니다.\n둘째 줄입니다.");
 	}
@@ -196,7 +204,7 @@ class CultureApiMapperTest {
 	void toDetail_워드프레스_태그제거() {
 		CultureApiResponse.Item item = mapper.parse(DETAIL2_WORDPRESS_XML).items().get(0);
 
-		CatalogDetailData detail = mapper.toDetail(item, null);
+		CatalogDetailData detail = mapper.toDetail(item);
 
 		String desc = detail.description();
 		// 태그·주석·이스케이프 잔재가 남지 않아야 한다
@@ -213,7 +221,7 @@ class CultureApiMapperTest {
 	void toDetail_이중이스케이프_태그제거() {
 		CultureApiResponse.Item item = mapper.parse(DETAIL2_DOUBLE_ESCAPED_XML).items().get(0);
 
-		CatalogDetailData detail = mapper.toDetail(item, null);
+		CatalogDetailData detail = mapper.toDetail(item);
 
 		assertThat(detail.description()).isEqualTo("소장품 이야기");
 	}

@@ -12,7 +12,7 @@ import java.time.LocalDate;
  * 인프라(외부 응답 파싱)와 애플리케이션(Exhibition 매핑) 사이의 경계 DTO — HTTP·XML/JSON 세부를 도메인에 노출하지 않는다.
  * 결측이 잦은 원천 특성상 대부분 필드가 nullable이다(공공데이터 리뷰: 좌표·썸네일·가격 빈 값 빈번).
  *
- * @param payload realm2 응답 아이템의 매핑 JSON(도메인 변환 이전 값) — 벤더층({@code culture_list_response}) 적재용.
+ * @param vendorItem 벤더 원문 verbatim(스냅샷 적재용 — ADR-13)
  *                도메인은 이 문자열을 <b>해석하지 않는다</b>(불투명 값). XML 세부를 도메인에 노출하지 않는다는 이 DTO의
  *                계약과 어긋나지 않는 이유이며, {@link PlaceHoursData#rawJson()}이 이미 같은 역할을 같은 방식으로 한다.
  *                파싱에 실패했거나 조각을 특정할 수 없으면 null이다(적재를 건너뛴다).
@@ -33,7 +33,7 @@ public record CatalogExhibitionData(
 		String sigungu,
 		String realmName,
 		String areaText,
-		String payload) {
+		CatalogVendorItem vendorItem) {
 
 	/** 원천 식별자·제목이 없는 행은 적재 불가 — 유효한 수집 데이터만 통과시킨다. */
 	public boolean isPersistable() {

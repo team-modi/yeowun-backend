@@ -1,7 +1,7 @@
 package modi.backend.ingestion.domain.data;
 
 import modi.backend.domain.exhibition.genre.GenreClassifier;
-import modi.backend.domain.exhibition.hours.PlaceHoursProvider;
+import modi.backend.ingestion.domain.port.PlaceHoursProvider;
 
 import java.util.List;
 

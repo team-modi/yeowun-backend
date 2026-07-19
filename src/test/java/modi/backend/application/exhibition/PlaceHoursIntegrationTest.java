@@ -29,12 +29,14 @@ import modi.backend.domain.exhibition.catalog.ExhibitionPlaceRepository;
 import modi.backend.domain.exhibition.catalog.ExhibitionRegion;
 import modi.backend.domain.exhibition.hours.PlaceHours;
 import modi.backend.domain.exhibition.hours.PlaceHoursData;
-import modi.backend.domain.exhibition.hours.PlaceHoursProvider;
+import modi.backend.ingestion.domain.data.GooglePlaceVendorItem;
+import modi.backend.ingestion.domain.data.PlaceHoursFetch;
+import modi.backend.ingestion.domain.port.PlaceHoursProvider;
 import modi.backend.infra.exhibition.hours.PlaceHoursJpaRepository;
 import modi.backend.domain.exhibition.hours.PlaceHoursStatus;
 import modi.backend.domain.exhibition.hours.PlaceHoursVendor;
 import modi.backend.domain.exhibition.hours.WeeklyOpeningHours;
-import modi.backend.ingestion.infra.GooglePlaceResponseJpaRepository;
+import modi.backend.ingestion.infra.GooglePlaceSnapshotJpaRepository;
 
 /**
  * 전시 영업시간 보강 전 경로 통합 검증(@SpringBootTest + Testcontainers-MySQL). 외부 조회기({@link PlaceHoursProvider})만 목으로 두고
@@ -56,7 +58,7 @@ class PlaceHoursIntegrationTest {
 	ExhibitionPlaceRepository exhibitionPlaceRepository;
 
 	@Autowired
-	GooglePlaceResponseJpaRepository googlePlaceResponseJpaRepository;
+	GooglePlaceSnapshotJpaRepository googlePlaceSnapshotJpaRepository;
 
 	@Autowired
 	PlaceHoursJpaRepository placeHoursRepository;
@@ -82,7 +84,7 @@ class PlaceHoursIntegrationTest {
 		placeHoursEnricher.enrichPlaceHours();
 
 		verify(placeHoursProvider, times(1)).fetch(eq(place.getName()), eq(place.getAddress())); // 장소당 1콜
-		assertThat(googlePlaceResponseJpaRepository.findByExhibitionPlaceId(place.getId())).isPresent();
+		assertThat(googlePlaceSnapshotJpaRepository.findByExhibitionPlaceId(place.getId())).isPresent();
 		PlaceHours canonical = placeHoursRepository.findByExhibitionPlaceId(place.getId()).orElseThrow();
 		assertThat(canonical.getFormatted()).isEqualTo("매일 10:00 ~ 18:00\n월 휴무");
 		assertThat(canonical.getStatus()).isEqualTo(PlaceHoursStatus.SUCCEEDED);
@@ -139,7 +141,7 @@ class PlaceHoursIntegrationTest {
 		PlaceHours canonical = placeHoursRepository.findByExhibitionPlaceId(place.getId()).orElseThrow();
 		assertThat(canonical.getFormatted()).isNull();
 		assertThat(canonical.getSyncedAt()).isNotNull();
-		assertThat(googlePlaceResponseJpaRepository.findByExhibitionPlaceId(place.getId())).isPresent();
+		assertThat(googlePlaceSnapshotJpaRepository.findByExhibitionPlaceId(place.getId())).isPresent();
 		assertThat(canonical.getStatus()).isEqualTo(PlaceHoursStatus.NO_HOURS);
 	}
 
@@ -154,7 +156,7 @@ class PlaceHoursIntegrationTest {
 		PlaceHours canonical = placeHoursRepository.findByExhibitionPlaceId(place.getId()).orElseThrow();
 		assertThat(canonical.getFormatted()).isNull();
 		assertThat(canonical.getSyncedAt()).isNotNull();
-		assertThat(googlePlaceResponseJpaRepository.findByExhibitionPlaceId(place.getId())).isEmpty();
+		assertThat(googlePlaceSnapshotJpaRepository.findByExhibitionPlaceId(place.getId())).isEmpty();
 		assertThat(canonical.getStatus()).isEqualTo(PlaceHoursStatus.NOT_FOUND);
 	}
 
@@ -196,7 +198,8 @@ class PlaceHoursIntegrationTest {
 		return builder.build();
 	}
 
-	private PlaceHoursData data(String addr, WeeklyOpeningHours hours) {
-		return new PlaceHoursData(hours, "{\"id\":\"pid-" + addr + "\",\"formattedAddress\":\"" + addr + "\"}");
+	private PlaceHoursFetch data(String addr, WeeklyOpeningHours hours) {
+		return new PlaceHoursFetch(new PlaceHoursData(hours),
+				new GooglePlaceVendorItem("pid-" + addr, null, addr, null));
 	}
 }

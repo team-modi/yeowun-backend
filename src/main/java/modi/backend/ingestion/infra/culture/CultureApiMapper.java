@@ -8,10 +8,10 @@ import java.time.format.DateTimeFormatter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+
+import modi.backend.ingestion.domain.data.CatalogVendorItem;
 import org.springframework.web.util.HtmlUtils;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 
 import modi.backend.domain.exhibition.catalog.CatalogDetailData;
@@ -33,8 +33,6 @@ public class CultureApiMapper {
 	private static final Logger log = LoggerFactory.getLogger(CultureApiMapper.class);
 	private static final DateTimeFormatter YYYYMMDD = DateTimeFormatter.ofPattern("yyyyMMdd");
 	private static final XmlMapper xmlMapper = new XmlMapper();
-	private static final ObjectMapper jsonMapper = new ObjectMapper()
-			.setSerializationInclusion(JsonInclude.Include.NON_NULL);
 
 	public CultureApiResponse parse(String xml) {
 		CultureApiResponse body;
@@ -53,38 +51,24 @@ public class CultureApiMapper {
 	}
 
 	/**
-	 * 응답 아이템 하나를 벤더층 payload(JSON)로 직렬화한다 — {@code culture_*_response.payload} 적재용.
-	 *
-	 * <p><b>왜 응답 XML을 그대로 자르지 않고 매핑된 구조를 남기나</b>: 원천의 응답 구조가 실측으로 확정돼 있기 때문이다
-	 * (2026-07-15, {@code docs/개인 폴더/전시/공공데이터-제공률-실측과-DB빈값-분석.md}). 목록 전수 279건·상세 60건의
-	 * <b>응답 태그를 전수 집계</b>한 결과 realm2는 12필드, detail2는 18태그이고, 그 합집합이 {@link CultureApiResponse.Item}이
-	 * 선언한 20필드와 정확히 일치한다. 즉 <b>원천에 우리가 안 받는 필드가 존재하지 않으므로</b> 이 직렬화는 무손실이다.
-	 * ({@code @JsonIgnoreProperties(ignoreUnknown = true)}는 미래 대비 방어일 뿐, 지금 버리는 필드가 있다는 뜻이 아니다.)
-	 *
-	 * <p>덕분에 원문 조각을 잘라 인덱스로 짝짓는 경로가 통째로 사라진다 — 짝이 밀리면 <b>A 전시의 원본이 B에 붙어</b>
-	 * 재파싱 원료가 오염되는데, 아이템 객체에서 바로 직렬화하면 그 사고가 원인부터 불가능하다.
-	 * 코드베이스의 기존 관행({@code google_place_response.raw_json})과도 같은 방식이다.
+	 * 응답 아이템 하나를 벤더 스냅샷 어휘(원문 verbatim)로 옮긴다 — {@code culture_*_snapshot} 적재용(ADR-13).
 	 *
 	 * <p>도메인 변환({@code decode()}·HTML 평문 추출) <b>이전</b> 값이라 재파싱 원료로서 온전하다 — 특히
 	 * {@code contents1}의 워드프레스 HTML 원문이 보존되어, 평문 추출 규칙이 바뀌면 여기서 다시 뽑을 수 있다.
-	 *
-	 * <p><b>잔여 위험</b>: 원천이 <i>나중에</i> 필드를 추가하면 파싱 시 버려져 payload에도 남지 않는다.
-	 * 실측 기준으로 지금은 그런 필드가 없고, 추가되면 {@code Item}에 선언을 더하는 것이 정상 대응이다.
+	 * 원천의 응답 구조는 실측으로 확정돼 있다(목록 279건·상세 60건 태그 전수 집계 = Item 20필드와 일치 —
+	 * 제공률 분석 문서). 원천이 나중에 필드를 추가하면 {@code Item}에 선언을 더하는 것이 정상 대응이다.
 	 */
-	public String payloadOf(CultureApiResponse.Item item) {
+	public CatalogVendorItem vendorOf(CultureApiResponse.Item item) {
 		if (item == null) {
 			return null;
 		}
-		try {
-			return jsonMapper.writeValueAsString(item);
-		} catch (Exception e) {
-			// 원본 적재는 부가 기록이다 — 직렬화가 실패해도 수집·적재를 깨지 않고 payload 없이 진행한다.
-			log.debug("응답 원본 직렬화 실패(무시): {}", e.getMessage());
-			return null;
-		}
+		return new CatalogVendorItem(item.seq(), item.title(), item.startDate(), item.endDate(), item.place(),
+				item.realmName(), item.area(), item.sigungu(), item.thumbnail(), item.gpsX(), item.gpsY(),
+				item.serviceName(), item.price(), item.contents1(), item.url(), item.phone(), item.imgUrl(),
+				item.placeUrl(), item.placeAddr(), item.placeSeq());
 	}
 
-	public CatalogExhibitionData toCatalog(CultureApiResponse.Item item, String payload) {
+	public CatalogExhibitionData toCatalog(CultureApiResponse.Item item) {
 		return new CatalogExhibitionData(
 				item.seq(),
 				decode(item.title()),
@@ -101,14 +85,14 @@ public class CultureApiMapper {
 				blankToNull(item.sigungu()),
 				decode(blankToNull(item.realmName())),
 				decode(blankToNull(item.area())),
-				payload);
+				vendorOf(item));
 	}
 
-	public CatalogDetailData toDetail(CultureApiResponse.Item item, String payload) {
+	public CatalogDetailData toDetail(CultureApiResponse.Item item) {
 		return new CatalogDetailData(
 				decode(blankToNull(item.price())), decodeDescription(blankToNull(item.contents1())), blankToNull(item.url()),
 				decode(blankToNull(item.phone())), blankToNull(item.imgUrl()), blankToNull(item.placeUrl()),
-				decode(blankToNull(item.placeAddr())), blankToNull(item.placeSeq()), payload);
+				decode(blankToNull(item.placeAddr())), blankToNull(item.placeSeq()));
 	}
 
 	private static String blankToNull(String value) {

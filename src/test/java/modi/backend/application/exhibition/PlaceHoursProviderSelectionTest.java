@@ -13,7 +13,7 @@ import modi.backend.TestcontainersConfiguration;
 import modi.backend.ingestion.domain.port.ExhibitionCatalogClient;
 import modi.backend.domain.exhibition.hours.OpeningHoursFormatter;
 import modi.backend.domain.exhibition.hours.PlaceHoursData;
-import modi.backend.domain.exhibition.hours.PlaceHoursProvider;
+import modi.backend.ingestion.domain.port.PlaceHoursProvider;
 import modi.backend.ingestion.infra.mock.MockPlaceHoursProvider;
 
 /**
@@ -42,7 +42,7 @@ class PlaceHoursProviderSelectionTest {
 		assertThat(placeHoursProvider.vendor())
 				.isEqualTo(modi.backend.domain.exhibition.hours.PlaceHoursVendor.MOCK);
 
-		PlaceHoursData data = placeHoursProvider.fetch("부산현대미술관", "부산광역시 사하구 낙동남로 1191").orElseThrow();
+		PlaceHoursData data = placeHoursProvider.fetch("부산현대미술관", "부산광역시 사하구 낙동남로 1191").orElseThrow().data();
 		assertThat(openingHoursFormatter.format(data.weeklyHours())).isEqualTo("매일 10:00 ~ 18:00\n월 휴무");
 	}
 }

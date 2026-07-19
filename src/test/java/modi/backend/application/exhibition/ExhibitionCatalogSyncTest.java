@@ -74,7 +74,7 @@ class ExhibitionCatalogSyncTest {
 
 		assertThat(staged).isEqualTo(1);
 		verify(draftFacade).stageFromList(any(), any()); // FETCH_DETAIL enqueue는 스테이징 트랜잭션 안(파사드)에서
-		verify(catalogClient, never()).fetchDetail(any()); // 상세는 아웃박스 릴레이가 조회한다
+		verify(catalogClient, never()).fetchDetailSnapshot(any()); // 상세는 아웃박스 릴레이가 조회한다
 	}
 
 	@Test
@@ -100,7 +100,7 @@ class ExhibitionCatalogSyncTest {
 
 		assertThat(staged).isZero();
 		verify(outboxFacade).enqueue(eq(OutboxMessageType.FETCH_DETAIL), eq("CAT-OLD"), any());
-		verify(catalogClient, never()).fetchDetail(any());
+		verify(catalogClient, never()).fetchDetailSnapshot(any());
 		verify(draftFacade, never()).stageFromList(any(), any()); // 이미 승격된 행 — draft를 만들지 않는다
 	}
 
@@ -118,7 +118,7 @@ class ExhibitionCatalogSyncTest {
 		int staged = synchronizer.syncCatalog();
 
 		assertThat(staged).isEqualTo(1); // CAT-OK만 스테이징
-		verify(facade).archiveListResponse(eq(invalid), any()); // 탈락 항목도 원본은 보존(요구사항 명문화)
+		verify(facade).archiveListSnapshot(eq(invalid), any()); // 탈락 항목도 원본은 보존(요구사항 명문화)
 		verify(draftFacade, never()).stageFromList(eq(invalid), any());
 	}
 
@@ -132,6 +132,6 @@ class ExhibitionCatalogSyncTest {
 		int staged = synchronizer.syncCatalog();
 
 		assertThat(staged).isZero(); // 갱신은 신규 스테이징 수에 잡히지 않는다
-		verify(facade).archiveSyncRun(any(), eq(0), eq(1), eq(0), eq(0));
+		verify(facade).archiveIngestionRun(any(), eq(0), eq(1), eq(0), eq(0));
 	}
 }

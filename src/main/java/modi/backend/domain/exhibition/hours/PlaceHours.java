@@ -23,7 +23,7 @@ import lombok.NoArgsConstructor;
  * 한 행을 공유한다 — 그래서 조회도 장소당 1콜이면 된다.
  *
  * <p>여기 들어가는 건 <b>우리가 정의한 표시 모델</b>({@code formatted})뿐이다. 벤더 원본 JSON은
- * {@link GooglePlaceResponse}에 남는다 — 정준층에 벤더 원본을 복사하면 Silver가 Bronze의 복제가 되어 층의 의미가 죽는다.
+ * {@link GooglePlaceSnapshot}에 남는다 — 정준층에 벤더 원본을 복사하면 Silver가 Bronze의 복제가 되어 층의 의미가 죽는다.
  * 변환 규칙(요일 묶기·휴무 표기)이 바뀌면 벤더 원본에서 이 값을 재생성한다.
  *
  * <p>{@code status}가 푸는 문제와 {@code provider}가 푸는 문제는 각각

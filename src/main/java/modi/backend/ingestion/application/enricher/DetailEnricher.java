@@ -19,7 +19,7 @@ import modi.backend.ingestion.application.outbox.ExhibitionOutboxFacade;
 import modi.backend.ingestion.application.outbox.OutboxFailures;
 import modi.backend.ingestion.application.outbox.OutboxProcessing;
 import modi.backend.ingestion.config.OutboxProperties;
-import modi.backend.domain.exhibition.catalog.CatalogDetailData;
+import modi.backend.ingestion.domain.data.DetailFetch;
 import modi.backend.ingestion.domain.outbox.OutboxFailureType;
 import modi.backend.ingestion.domain.outbox.OutboxMessage;
 import modi.backend.ingestion.domain.outbox.OutboxMessageStatus;
@@ -124,15 +124,15 @@ public class DetailEnricher {
 			return OutboxProcessing.fail(exhibitionOutboxFacade, message, OutboxFailureType.RETRYABLE,
 					"대상 미존재 — 다음 카탈로그 동기화가 스테이징 예정", now);
 		}
-		Optional<CatalogDetailData> detail;
+		Optional<DetailFetch> detail;
 		try {
-			detail = catalogClient.fetchDetail(externalId); // 트랜잭션 밖 외부 호출
+			detail = catalogClient.fetchDetailSnapshot(externalId); // 트랜잭션 밖 외부 호출
 		} catch (RuntimeException e) {
 			return OutboxProcessing.fail(exhibitionOutboxFacade, message,
 					OutboxFailures.classify(e), OutboxFailures.describe(e), now);
 		}
 		try {
-			detail.ifPresentOrElse(d -> exhibitionSyncFacade.applyLegacyDetail(externalId, d),
+			detail.ifPresentOrElse(f -> exhibitionSyncFacade.applyLegacyDetail(externalId, f),
 					() -> exhibitionBackfill.markDetailChecked(externalId, LocalDateTime.now()));
 		} catch (OptimisticLockingFailureException e) {
 			return false; // 반영 중 충돌 — 다른 워커가 처리

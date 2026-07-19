@@ -14,11 +14,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import modi.backend.ingestion.config.PlaceHoursProperties;
 import modi.backend.ingestion.domain.ExternalApi;
-import modi.backend.ingestion.domain.entity.ExternalApiCall;
-import modi.backend.ingestion.domain.port.ExternalApiCallRepository;
+import modi.backend.ingestion.domain.entity.ExternalApiCallLog;
+import modi.backend.ingestion.domain.port.ExternalApiCallLogRepository;
 import modi.backend.ingestion.domain.ExternalApiOutcome;
 import modi.backend.domain.exhibition.hours.PlaceHoursData;
-import modi.backend.domain.exhibition.hours.PlaceHoursProvider;
+import modi.backend.ingestion.domain.data.GooglePlaceVendorItem;
+import modi.backend.ingestion.domain.data.PlaceHoursFetch;
+import modi.backend.ingestion.domain.port.PlaceHoursProvider;
 import modi.backend.domain.exhibition.hours.PlaceHoursVendor;
 import modi.backend.domain.exhibition.hours.WeeklyOpeningHours;
 
@@ -50,17 +52,17 @@ public class GooglePlaceHoursProvider implements PlaceHoursProvider {
 	private final GoogleMapsApi googleMapsApi;
 	private final PlaceHoursProperties properties;
 	/** 외부 호출 감사 — 이 API는 <b>유일한 유료 호출</b>이라 billable=true로 남긴다(비용 귀속). */
-	private final ExternalApiCallRepository externalApiCallRepository;
+	private final ExternalApiCallLogRepository externalApiCallRepository;
 
 	public GooglePlaceHoursProvider(GoogleMapsApi googleMapsApi, PlaceHoursProperties properties,
-			ExternalApiCallRepository externalApiCallRepository) {
+			ExternalApiCallLogRepository externalApiCallRepository) {
 		this.googleMapsApi = googleMapsApi;
 		this.properties = properties;
 		this.externalApiCallRepository = externalApiCallRepository;
 	}
 
 	@Override
-	public Optional<PlaceHoursData> fetch(String placeName, String placeAddr) {
+	public Optional<PlaceHoursFetch> fetch(String placeName, String placeAddr) {
 		GoogleMapsDto.SearchTextRequest request = new GoogleMapsDto.SearchTextRequest(
 				buildQuery(placeName, placeAddr), properties.languageCode(), properties.regionCode());
 		java.time.LocalDateTime calledAt = java.time.LocalDateTime.now();
@@ -73,9 +75,9 @@ public class GooglePlaceHoursProvider implements PlaceHoursProvider {
 			record(placeAddr, ExternalApiOutcome.FAILED, calledAt);
 			throw e;
 		}
-		Optional<PlaceHoursData> data = response == null
+		Optional<PlaceHoursFetch> data = response == null
 				? Optional.empty()
-				: response.firstPlace().map(place -> toData(place, placeAddr));
+				: response.firstPlace().map(this::toFetch);
 		// 검색 결과 없음은 실패가 아니라 "구글이 그런 장소를 모른다"는 사실이다.
 		record(placeAddr, data.isPresent() ? ExternalApiOutcome.SUCCESS : ExternalApiOutcome.NO_DATA, calledAt);
 		return data;
@@ -84,7 +86,7 @@ public class GooglePlaceHoursProvider implements PlaceHoursProvider {
 	/** 감사 기록은 부가 기능이다 — 여기서 실패해도 영업시간 보강을 깨지 않는다. */
 	private void record(String placeAddr, ExternalApiOutcome outcome, java.time.LocalDateTime calledAt) {
 		try {
-			externalApiCallRepository.save(ExternalApiCall.billable(ExternalApi.GOOGLE,
+			externalApiCallRepository.save(ExternalApiCallLog.billable(ExternalApi.GOOGLE,
 					modi.backend.domain.exhibition.hours.PlaceKey.of(placeAddr), outcome, calledAt));
 		} catch (RuntimeException e) {
 			log.warn("구글 호출 감사 기록 실패(무시): {}", e.getMessage());
@@ -104,9 +106,12 @@ public class GooglePlaceHoursProvider implements PlaceHoursProvider {
 		return PlaceHoursVendor.GOOGLE;
 	}
 
-	private PlaceHoursData toData(GoogleMapsDto.Place place, String queriedAddr) {
-		// place_id·displayName·formattedAddress는 별도 필드로 올리지 않는다 — rawJson(Place 전체)에 원본 그대로 들어간다.
-		return new PlaceHoursData(toWeekly(place.regularOpeningHours()), rawJson(place));
+	private PlaceHoursFetch toFetch(GoogleMapsDto.Place place) {
+		// 응답 구조 필드 + 깊은 중첩(영업시간)은 구조 보존 JSON — 스냅샷(google_place_snapshot) 적재 어휘(ADR-13).
+		GooglePlaceVendorItem vendor = new GooglePlaceVendorItem(place.id(),
+				place.displayName() == null ? null : place.displayName().text(),
+				place.formattedAddress(), openingHoursJson(place.regularOpeningHours()));
+		return new PlaceHoursFetch(new PlaceHoursData(toWeekly(place.regularOpeningHours())), vendor);
 	}
 
 	/** periods를 요일별 영업시간으로. day/시각 결측이나 close 부재(24시간 등)는 건너뛴다(엣지 — P1에서 정교화). */
@@ -138,18 +143,15 @@ public class GooglePlaceHoursProvider implements PlaceHoursProvider {
 	}
 
 	/**
-	 * 벤더층({@code google_place_response.raw_json})에 남길 <b>구글 Place 응답 전체</b>를 직렬화한다.
-	 * <p>
-	 * {@code regularOpeningHours}만 남기지 않는 이유: V19의 {@code google_place_hours}는 place_id·displayName·
-	 * formattedAddress를 <b>별도 컬럼</b>으로 갖고 있었는데, 그 테이블을 대체하면서 그 값들이 사라지면 안 된다.
-	 * 벤더 원본은 벤더 어휘 그대로 한 덩어리로 남긴다는 층 규칙에도 맞고, 구글이 필드를 늘려도 스키마 변경이 없다.
+	 * 스냅샷의 {@code regular_opening_hours} JSON 컬럼에 남길 영업시간 중첩 구조를 직렬화한다(ADR-13).
+	 * place_id·displayName·formattedAddress는 별도 필드 컬럼으로 올라가므로 여기엔 영업시간만 남는다.
 	 */
-	private String rawJson(GoogleMapsDto.Place place) {
-		if (place == null) {
+	private String openingHoursJson(GoogleMapsDto.RegularOpeningHours hours) {
+		if (hours == null) {
 			return null;
 		}
 		try {
-			return OBJECT_MAPPER.writeValueAsString(place);
+			return OBJECT_MAPPER.writeValueAsString(hours);
 		} catch (Exception e) {
 			log.debug("영업시간 원본 직렬화 실패(무시): {}", e.getMessage());
 			return null;

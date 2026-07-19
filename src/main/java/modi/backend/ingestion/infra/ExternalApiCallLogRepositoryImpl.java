@@ -5,8 +5,8 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import lombok.RequiredArgsConstructor;
-import modi.backend.ingestion.domain.entity.ExternalApiCall;
-import modi.backend.ingestion.domain.port.ExternalApiCallRepository;
+import modi.backend.ingestion.domain.entity.ExternalApiCallLog;
+import modi.backend.ingestion.domain.port.ExternalApiCallLogRepository;
 
 /**
  * 외부 호출 감사 어댑터.
@@ -23,13 +23,13 @@ import modi.backend.ingestion.domain.port.ExternalApiCallRepository;
  */
 @Repository
 @RequiredArgsConstructor
-public class ExternalApiCallRepositoryImpl implements ExternalApiCallRepository {
+public class ExternalApiCallLogRepositoryImpl implements ExternalApiCallLogRepository {
 
-	private final ExternalApiCallJpaRepository jpaRepository;
+	private final ExternalApiCallLogJpaRepository jpaRepository;
 
 	@Override
 	@Transactional(propagation = Propagation.REQUIRES_NEW)
-	public ExternalApiCall save(ExternalApiCall externalApiCall) {
+	public ExternalApiCallLog save(ExternalApiCallLog externalApiCall) {
 		return jpaRepository.save(externalApiCall);
 	}
 }

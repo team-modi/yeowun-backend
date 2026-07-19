@@ -1,6 +1,6 @@
 package modi.backend.domain.exhibition.catalog;
 
-import modi.backend.ingestion.domain.entity.GooglePlaceResponse;
+import modi.backend.ingestion.domain.entity.GooglePlaceSnapshot;
 import modi.backend.domain.exhibition.hours.PlaceHours;
 import modi.backend.domain.exhibition.hours.PlaceKey;
 
@@ -23,7 +23,7 @@ import modi.backend.support.entity.BaseEntity;
  * 도착해야 채워지므로 Optional이다({@link #enrichDetail}).
  *
  * <p>{@link Exhibition}과는 {@code exhibition_place_id}로 이어진다(자식→부모 실제 FK). 영업시간·구글 원본은 이 전시장에
- * 1:1로 정렬된다({@link PlaceHours}·{@link GooglePlaceResponse}가 {@code exhibition_place_id}로 참조).
+ * 1:1로 정렬된다({@link PlaceHours}·{@link GooglePlaceSnapshot}가 {@code exhibition_place_id}로 참조).
  */
 @Entity
 @Table(name = "exhibition_place")

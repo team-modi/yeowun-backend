@@ -21,7 +21,7 @@ import org.springframework.web.service.invoker.HttpServiceProxyFactory;
 
 import modi.backend.ingestion.config.PublicDataProperties;
 import modi.backend.ingestion.domain.ExternalApi;
-import modi.backend.ingestion.domain.entity.ExternalApiCall;
+import modi.backend.ingestion.domain.entity.ExternalApiCallLog;
 import modi.backend.ingestion.domain.ExternalApiOutcome;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
@@ -33,7 +33,7 @@ import okhttp3.mockwebserver.MockWebServer;
  * FAILED(전송 오류)의 구분을 본다 — 현행은 외부 호출 기록이 아예 없어 "폴백이 왜 늘었나"·"오늘 몇 번 불렀나"를
  * 로그 grep으로만 알 수 있었다.
  * <p>
- * 감사 저장소는 인메모리 스텁으로 둔다(저장 자체는 {@code ExternalApiCallRepositoryImpl}의 책임 — REQUIRES_NEW).
+ * 감사 저장소는 인메모리 스텁으로 둔다(저장 자체는 {@code ExternalApiCallLogRepositoryImpl}의 책임 — REQUIRES_NEW).
  */
 class CultureExhibitionClientAuditTest {
 
@@ -47,7 +47,7 @@ class CultureExhibitionClientAuditTest {
 
 	private MockWebServer server;
 	private CultureExhibitionClient client;
-	private List<ExternalApiCall> recorded;
+	private List<ExternalApiCallLog> recorded;
 
 	@BeforeEach
 	void setUp() throws IOException {
@@ -84,7 +84,7 @@ class CultureExhibitionClientAuditTest {
 		client.fetchAll();
 
 		assertThat(recorded).hasSize(1);
-		ExternalApiCall call = recorded.get(0);
+		ExternalApiCallLog call = recorded.get(0);
 		assertThat(call.getApi()).isEqualTo(ExternalApi.CULTURE_LIST);
 		assertThat(call.getOutcome()).isEqualTo(ExternalApiOutcome.SUCCESS);
 		assertThat(call.isBillable()).isFalse(); // 문화포털은 무료

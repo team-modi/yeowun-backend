@@ -21,8 +21,8 @@ import modi.backend.ingestion.config.OutboxProperties;
 import modi.backend.ingestion.domain.outbox.OutboxMessage;
 import modi.backend.ingestion.domain.outbox.OutboxMessageType;
 import modi.backend.domain.exhibition.hours.OpeningHoursFormatter;
-import modi.backend.domain.exhibition.hours.PlaceHoursData;
-import modi.backend.domain.exhibition.hours.PlaceHoursProvider;
+import modi.backend.ingestion.domain.data.PlaceHoursFetch;
+import modi.backend.ingestion.domain.port.PlaceHoursProvider;
 
 /**
  * 이벤트 구동 영업시간 재검증 처리기(설계 §4-1) — 전시 아웃박스의 영업시간 메시지
@@ -83,9 +83,10 @@ public class PlaceHoursRefresher {
 		}
 		PlaceHoursTarget target = resolved.get();
 		try {
-			Optional<PlaceHoursData> data = placeHoursProvider.fetch(target.placeName(), target.placeAddr());
-			String formatted = data.map(d -> openingHoursFormatter.format(d.weeklyHours())).orElse(null);
-			exhibitionSyncFacade.applyVenueHours(target, data.orElse(null), formatted, placeHoursProvider.vendor(), now);
+			Optional<PlaceHoursFetch> fetched = placeHoursProvider.fetch(target.placeName(), target.placeAddr());
+			String formatted = fetched.map(f -> openingHoursFormatter.format(f.data().weeklyHours())).orElse(null);
+			exhibitionSyncFacade.applyVenueHours(target, fetched.map(PlaceHoursFetch::data).orElse(null),
+						fetched.map(PlaceHoursFetch::vendor).orElse(null), formatted, placeHoursProvider.vendor(), now);
 		} catch (org.springframework.dao.OptimisticLockingFailureException e) {
 			return false; // 반영 중 충돌 — 다른 워커가 처리
 		} catch (RuntimeException e) {

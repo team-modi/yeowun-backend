@@ -15,7 +15,7 @@ import modi.backend.ingestion.application.outbox.ExhibitionOutboxFacade;
 import modi.backend.ingestion.domain.SyncTrigger;
 import modi.backend.ingestion.domain.data.CatalogExhibitionData;
 import modi.backend.ingestion.domain.data.CatalogListData;
-import modi.backend.ingestion.domain.entity.SyncRun;
+import modi.backend.ingestion.domain.entity.IngestionRun;
 import modi.backend.ingestion.domain.outbox.OutboxMessageType;
 import modi.backend.ingestion.domain.port.ExhibitionCatalogClient;
 
@@ -56,7 +56,7 @@ public class CatalogSynchronizer {
 		// 배치 전체가 같은 last_seen_at을 공유해야 "이번 동기화에 안 보인 행"(last_seen_at < 이 시각)이 한 번에 가려진다.
 		// 아이템마다 now()를 찍으면 그 경계가 흐려진다.
 		LocalDateTime syncedAt = LocalDateTime.now();
-		SyncRun run = SyncRun.started(trigger, syncedAt);
+		IngestionRun run = IngestionRun.started(trigger, syncedAt);
 		CatalogListData fetched = catalogClient.fetchAll();
 		List<CatalogExhibitionData> collected = fetched.items();
 		run.fetched(fetched.totalCount(), fetched.truncated(), collected.size());
@@ -69,7 +69,7 @@ public class CatalogSynchronizer {
 		int skipped = 0;
 		int deferred = 0;
 		for (CatalogExhibitionData data : collected) {
-			exhibitionSyncFacade.archiveListResponse(data, syncedAt);
+			exhibitionSyncFacade.archiveListSnapshot(data, syncedAt);
 			if (!hasValidPeriod(data)) {
 				skipped++;
 				continue;
@@ -89,7 +89,7 @@ public class CatalogSynchronizer {
 			log.info("전시 동기화: 수집 {} / 신규스테이징 {} / 갱신·뒤채움 {} / 기간스킵 {} / 실패연기 {}",
 					collected.size(), staged, touched, skipped, deferred);
 		}
-		exhibitionSyncFacade.archiveSyncRun(run, staged, touched, skipped, deferred);
+		exhibitionSyncFacade.archiveIngestionRun(run, staged, touched, skipped, deferred);
 		return staged;
 	}
 

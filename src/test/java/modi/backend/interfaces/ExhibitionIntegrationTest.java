@@ -41,6 +41,7 @@ import modi.backend.application.exhibition.ExhibitionFacade;
 import modi.backend.domain.bookmark.ExhibitionBookmarkRepository;
 import modi.backend.domain.exhibition.catalog.CatalogDetailData;
 import modi.backend.ingestion.domain.data.CatalogExhibitionData;
+import modi.backend.ingestion.domain.data.DetailFetch;
 import modi.backend.ingestion.domain.data.CatalogListData;
 import modi.backend.domain.exhibition.catalog.Exhibition;
 import modi.backend.ingestion.domain.port.ExhibitionCatalogClient;
@@ -119,9 +120,9 @@ class ExhibitionIntegrationTest {
 						"기관", null, null,
 						null, "사진", "서울", null))));
 		// syncCatalog가 적재 시점에 상세2까지 함께 채운다 — CAT-MONET만 상세를 준다(나머지는 상세 없음 → 목록 필드만).
-		given(catalogClient.fetchDetail("CAT-MONET")).willReturn(Optional.of(
+		given(catalogClient.fetchDetailSnapshot("CAT-MONET")).willReturn(Optional.of(new DetailFetch(
 				new CatalogDetailData("성인 20,000원", "모네 특별전 설명", "https://detail/monet", "02-1234-5678",
-						"https://img/monet.jpg", "https://place/monet", "서울 어딘가", "PLACE-SEQ-1", null)));
+						"https://img/monet.jpg", "https://place/monet", "서울 어딘가", "PLACE-SEQ-1"), null)));
 		catalogSynchronizer.syncCatalog();
 		detailEnricher.enrichDetails(); // 스테이징 → 상세 해소(ADR-10 — 전시는 승격 후에만 나타난다)
 		genreEnricher.enrichGenres();
@@ -129,7 +130,7 @@ class ExhibitionIntegrationTest {
 	}
 
 	/**
-	 * 목록 수집 결과 래퍼 — 포트가 이제 "원천이 말한 총 건수·절단 여부"까지 돌려준다(이관 5단계, sync_run이 채울 값).
+	 * 목록 수집 결과 래퍼 — 포트가 이제 "원천이 말한 총 건수·절단 여부"까지 돌려준다(이관 5단계, ingestion_run이 채울 값).
 	 * 이 테스트들의 관심사가 아니라 아이템만 담고 totalCount는 수집 수와 같게 둔다(= 절단 없음).
 	 */
 	private static CatalogListData listData(java.util.List<CatalogExhibitionData> items) {

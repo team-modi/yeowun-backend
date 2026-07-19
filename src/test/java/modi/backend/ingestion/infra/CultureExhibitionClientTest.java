@@ -21,6 +21,7 @@ import org.springframework.web.service.invoker.HttpServiceProxyFactory;
 import modi.backend.ingestion.config.PublicDataProperties;
 import modi.backend.domain.exhibition.catalog.CatalogDetailData;
 import modi.backend.ingestion.domain.data.CatalogExhibitionData;
+import modi.backend.ingestion.domain.data.DetailFetch;
 import modi.backend.domain.exhibition.catalog.ExhibitionRegion;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
@@ -104,15 +105,14 @@ class CultureExhibitionClientTest {
 	}
 
 	@Test
-	@DisplayName("fetchAll — 각 아이템에 자기 응답 원본(매핑 JSON)이 실려 나온다")
-	void fetchAll_payload_매핑JSON() {
+	@DisplayName("fetchAll — 각 아이템에 자기 응답의 벤더 원문(verbatim)이 실려 나온다")
+	void fetchAll_벤더원문_동승() {
 		server.enqueue(new MockResponse().setBody(REALM2_XML).addHeader("Content-Type", "application/xml"));
 
 		List<CatalogExhibitionData> result = client.fetchAll().items();
 
-		assertThat(result.get(0).payload())
-				.contains("\"seq\":\"319005\"")
-				.contains("\"gpsY\":\"35.1\""); // 마지막 필드까지 온전히 담긴다
+		assertThat(result.get(0).vendorItem().seq()).isEqualTo("319005");
+		assertThat(result.get(0).vendorItem().gpsY()).isEqualTo("35.1"); // 마지막 필드까지 온전히 담긴다
 	}
 
 	@Test
@@ -130,18 +130,18 @@ class CultureExhibitionClientTest {
 		// 짝이 밀리면 재파싱 원료가 통째로 오염된다 — 없는 것보다 나쁘다.
 		assertThat(result).hasSize(2);
 		assertThat(result.get(0).externalId()).isEqualTo("1001");
-		assertThat(result.get(0).payload()).contains("\"seq\":\"1001\"").doesNotContain("1002");
+		assertThat(result.get(0).vendorItem().seq()).isEqualTo("1001");
 		assertThat(result.get(1).externalId()).isEqualTo("1002");
-		assertThat(result.get(1).payload()).contains("\"seq\":\"1002\"").doesNotContain("1001");
+		assertThat(result.get(1).vendorItem().seq()).isEqualTo("1002");
 	}
 
 	@Test
-	@DisplayName("fetchDetail — 상세 응답에도 원본이 실려 나온다")
-	void fetchDetail_payload_매핑JSON() {
+	@DisplayName("fetchDetailSnapshot — 상세 응답에도 벤더 원문이 실려 나온다(도메인 값과 같은 응답에서)")
+	void fetchDetailSnapshot_벤더원문_동승() {
 		server.enqueue(new MockResponse().setBody(DETAIL2_XML).addHeader("Content-Type", "application/xml"));
 
-		Optional<CatalogDetailData> result = client.fetchDetail("319005");
+		Optional<DetailFetch> result = client.fetchDetailSnapshot("319005");
 
-		assertThat(result.get().payload()).contains("\"placeSeq\":\"P1\"");
+		assertThat(result.get().vendor().placeSeq()).isEqualTo("P1");
 	}
 }
