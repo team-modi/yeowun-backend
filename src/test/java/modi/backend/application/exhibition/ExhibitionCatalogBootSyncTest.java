@@ -1,8 +1,8 @@
 package modi.backend.application.exhibition;
 
-import modi.backend.application.exhibition.sync.enricher.CatalogEnricher;
-import modi.backend.application.exhibition.sync.ExhibitionCatalogBootSync;
-import modi.backend.application.exhibition.sync.CatalogSynchronizer;
+import modi.backend.ingestion.application.enricher.GenreEnricher;
+import modi.backend.ingestion.application.ExhibitionCatalogBootSync;
+import modi.backend.ingestion.application.CatalogSynchronizer;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.BDDMockito.given;
@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.DefaultApplicationArguments;
 
 import modi.backend.domain.exhibition.catalog.ExhibitionErrorCode;
-import modi.backend.domain.exhibition.sync.SyncTrigger;
+import modi.backend.ingestion.domain.SyncTrigger;
 import modi.backend.support.error.CoreException;
 
 /**
@@ -27,14 +27,14 @@ import modi.backend.support.error.CoreException;
 class ExhibitionCatalogBootSyncTest {
 
 	private CatalogSynchronizer catalogSynchronizer;
-	private CatalogEnricher catalogEnricher;
+	private GenreEnricher genreEnricher;
 	private ExhibitionCatalogBootSync bootSync;
 
 	@BeforeEach
 	void setUp() {
 		catalogSynchronizer = mock(CatalogSynchronizer.class);
-		catalogEnricher = mock(CatalogEnricher.class);
-		bootSync = new ExhibitionCatalogBootSync(catalogSynchronizer, catalogEnricher);
+		genreEnricher = mock(GenreEnricher.class);
+		bootSync = new ExhibitionCatalogBootSync(catalogSynchronizer, genreEnricher);
 	}
 
 	@Test
@@ -46,7 +46,7 @@ class ExhibitionCatalogBootSyncTest {
 
 		// 동기화·장르 분류 모두 데몬 스레드에서 수행 — 비동기라 timeout으로 대기 검증.
 		verify(catalogSynchronizer, timeout(2000).times(1)).syncCatalog(SyncTrigger.BOOT);
-		verify(catalogEnricher, timeout(2000).times(1)).enrichGenres();
+		verify(genreEnricher, timeout(2000).times(1)).enrichGenres();
 	}
 
 	@Test

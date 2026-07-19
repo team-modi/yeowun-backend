@@ -27,15 +27,16 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import modi.backend.TestcontainersConfiguration;
-import modi.backend.application.exhibition.sync.CatalogSynchronizer;
-import modi.backend.application.exhibition.sync.enricher.CatalogEnricher;
-import modi.backend.application.exhibition.sync.enricher.DetailEnricher;
+import modi.backend.ingestion.application.CatalogSynchronizer;
+import modi.backend.ingestion.application.enricher.GenreEnricher;
+import modi.backend.ingestion.application.enricher.DraftPromoter;
+import modi.backend.ingestion.application.enricher.DetailEnricher;
 import modi.backend.application.exhibition.ExhibitionFacade;
 import modi.backend.domain.auth.TokenProvider;
-import modi.backend.domain.exhibition.sync.data.CatalogExhibitionData;
-import modi.backend.domain.exhibition.sync.data.CatalogListData;
+import modi.backend.ingestion.domain.data.CatalogExhibitionData;
+import modi.backend.ingestion.domain.data.CatalogListData;
 import modi.backend.domain.exhibition.catalog.Exhibition;
-import modi.backend.domain.exhibition.sync.port.ExhibitionCatalogClient;
+import modi.backend.ingestion.domain.port.ExhibitionCatalogClient;
 import modi.backend.domain.exhibition.catalog.ExhibitionCategory;
 import modi.backend.domain.exhibition.catalog.ExhibitionRegion;
 import modi.backend.domain.exhibition.catalog.ExhibitionRepository;
@@ -76,7 +77,10 @@ class RecordV1ControllerTest {
 	DetailEnricher detailEnricher;
 
 	@Autowired
-	CatalogEnricher catalogEnricher;
+	GenreEnricher genreEnricher;
+
+	@Autowired
+	DraftPromoter draftPromoter;
 
 	// 스냅샷 독립성 e2e(Task 14)에서만 사용 — CATALOG 재동기화로 원본 전시 제목을 실제로 바꿔보기 위해 수집 포트를 목으로 둔다.
 	@MockitoBean
@@ -177,7 +181,8 @@ class RecordV1ControllerTest {
 						"https://poster/snapshot.jpg", null, "기관", null, null, null, "전시", "서울", null))));
 		catalogSynchronizer.syncCatalog();
 		detailEnricher.enrichDetails(); // 스테이징 → 상세 해소(ADR-10 — 전시는 승격 후에만 나타난다)
-		catalogEnricher.enrichGenres(); // 장르 분류(테스트 기본 mock) + 승격
+		genreEnricher.enrichGenres();
+		draftPromoter.promoteReady(); // 승격 소비(ADR-12) // 장르 분류(테스트 기본 mock) + 승격
 		Long catalogExhibitionId = exhibitionRepository.findByExternalId(externalId).orElseThrow().getId();
 
 		// 2) 기록 작성 — RecordService.create가 이 시점의 전시 제목을 스냅샷으로 박제한다
@@ -215,7 +220,8 @@ class RecordV1ControllerTest {
 						"https://poster/mutated.jpg", null, "기관", null, null, null, "전시", "서울", null))));
 		catalogSynchronizer.syncCatalog();
 		detailEnricher.enrichDetails(); // 스테이징 → 상세 해소(ADR-10 — 전시는 승격 후에만 나타난다)
-		catalogEnricher.enrichGenres(); // 장르 분류(테스트 기본 mock) + 승격
+		genreEnricher.enrichGenres();
+		draftPromoter.promoteReady(); // 승격 소비(ADR-12) // 장르 분류(테스트 기본 mock) + 승격
 
 		// 기존 전시 행이 원천 갱신본으로 덮이지 않았음을 확인한다(신규만 추가 — 재적재 갱신 없음).
 		Exhibition afterResync = exhibitionRepository.findByExternalId(externalId).orElseThrow();
@@ -354,7 +360,7 @@ class RecordV1ControllerTest {
 	}
 
 	/**
-	 * 목록 수집 결과 래퍼 — 포트가 이제 "원천이 말한 총 건수·절단 여부"까지 돌려준다(이관 5단계, sync_run이 채울 값).
+	 * 목록 수집 결과 래퍼 — 포트가 이제 "원천이 말한 총 건수·절단 여부"까지 돌려준다(이관 5단계, ingestion_run이 채울 값).
 	 * 이 테스트들의 관심사가 아니라 아이템만 담고 totalCount는 수집 수와 같게 둔다(= 절단 없음).
 	 */
 	private static CatalogListData listData(java.util.List<CatalogExhibitionData> items) {

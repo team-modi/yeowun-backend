@@ -1,10 +1,13 @@
 package modi.backend.application.exhibition;
 
-import modi.backend.application.exhibition.sync.enricher.DetailEnricher;
-import modi.backend.application.exhibition.sync.enricher.DetailTargetState;
-import modi.backend.application.exhibition.sync.draft.ExhibitionDraftFacade;
-import modi.backend.application.exhibition.sync.outbox.ExhibitionOutboxFacade;
-import modi.backend.application.exhibition.sync.ExhibitionSyncFacade;
+import modi.backend.ingestion.application.enricher.DetailEnricher;
+import modi.backend.ingestion.domain.data.DetailFetch;
+import modi.backend.application.exhibition.contract.DetailTargetState;
+import modi.backend.ingestion.application.draft.DraftEnrichmentService;
+import modi.backend.ingestion.application.draft.ExhibitionDraftFacade;
+import modi.backend.ingestion.application.outbox.ExhibitionOutboxFacade;
+import modi.backend.ingestion.application.ExhibitionSyncFacade;
+import modi.backend.application.exhibition.contract.ExhibitionBackfill;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -21,13 +24,14 @@ import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import modi.backend.config.OutboxProperties;
-import modi.backend.domain.exhibition.sync.data.CatalogDetailData;
-import modi.backend.domain.exhibition.sync.outbox.OutboxMessage;
-import modi.backend.domain.exhibition.sync.port.ExhibitionCatalogClient;
+import modi.backend.ingestion.config.OutboxProperties;
+import modi.backend.domain.exhibition.catalog.CatalogDetailData;
+import modi.backend.ingestion.domain.outbox.OutboxMessage;
+import modi.backend.ingestion.domain.port.ExhibitionCatalogClient;
 import modi.backend.domain.exhibition.catalog.ExhibitionErrorCode;
-import modi.backend.domain.exhibition.sync.outbox.OutboxFailureType;
-import modi.backend.domain.exhibition.sync.outbox.OutboxMessageType;
+import modi.backend.ingestion.domain.outbox.OutboxFailureType;
+import modi.backend.ingestion.domain.outbox.OutboxMessageType;
+import modi.backend.domain.exhibition.genre.GenreClassifier;
 import modi.backend.support.error.CoreException;
 
 /**
@@ -42,8 +46,9 @@ class DetailEnricherTest {
 		return OutboxMessage.enqueue(OutboxMessageType.FETCH_DETAIL, externalId, LocalDateTime.now());
 	}
 
-	private static CatalogDetailData detail() {
-		return new CatalogDetailData("무료", "설명", null, null, null, null, "서울시 종로구", "PLACE-1", null);
+	private static DetailFetch detail() {
+		return new DetailFetch(new CatalogDetailData("무료", "설명", null, null, null, null, "서울시 종로구", "PLACE-1"),
+				null);
 	}
 
 	@Test
@@ -51,17 +56,19 @@ class DetailEnricherTest {
 	void 상세필요_채우고_성공() {
 		ExhibitionOutboxFacade jobFacade = mock(ExhibitionOutboxFacade.class);
 		ExhibitionSyncFacade facade = mock(ExhibitionSyncFacade.class);
+		ExhibitionBackfill backfill = mock(ExhibitionBackfill.class);
 		ExhibitionCatalogClient client = mock(ExhibitionCatalogClient.class);
 		ExhibitionDraftFacade draftFacade = mock(ExhibitionDraftFacade.class);
 		OutboxMessage job = detailJob("E1");
 		when(jobFacade.findDue(eq(OutboxMessageType.FETCH_DETAIL), anyInt(), any())).thenReturn(List.of(job));
-		when(facade.findDetailTargetState("E1")).thenReturn(DetailTargetState.NEEDS_DETAIL);
-		when(client.fetchDetail("E1")).thenReturn(Optional.of(detail()));
-		DetailEnricher enricher = new DetailEnricher(jobFacade, facade, draftFacade, client, props);
+		when(backfill.findDetailTargetState("E1")).thenReturn(DetailTargetState.NEEDS_DETAIL);
+		when(client.fetchDetailSnapshot("E1")).thenReturn(Optional.of(detail()));
+		DetailEnricher enricher = new DetailEnricher(jobFacade, facade, backfill, draftFacade,
+				new DraftEnrichmentService(draftFacade, client, mock(GenreClassifier.class)), client, props);
 
 		enricher.enrichDetails();
 
-		verify(facade).applyDetailForJob(eq("E1"), any());
+		verify(facade).applyLegacyDetail(eq("E1"), any());
 		verify(jobFacade).markSucceeded(eq(job), any());
 	}
 
@@ -70,19 +77,21 @@ class DetailEnricherTest {
 	void 상세실패_재시도기록() {
 		ExhibitionOutboxFacade jobFacade = mock(ExhibitionOutboxFacade.class);
 		ExhibitionSyncFacade facade = mock(ExhibitionSyncFacade.class);
+		ExhibitionBackfill backfill = mock(ExhibitionBackfill.class);
 		ExhibitionCatalogClient client = mock(ExhibitionCatalogClient.class);
 		ExhibitionDraftFacade draftFacade = mock(ExhibitionDraftFacade.class);
 		OutboxMessage job = detailJob("E1");
 		when(jobFacade.findDue(eq(OutboxMessageType.FETCH_DETAIL), anyInt(), any())).thenReturn(List.of(job));
-		when(facade.findDetailTargetState("E1")).thenReturn(DetailTargetState.NEEDS_DETAIL);
-		when(client.fetchDetail("E1"))
+		when(backfill.findDetailTargetState("E1")).thenReturn(DetailTargetState.NEEDS_DETAIL);
+		when(client.fetchDetailSnapshot("E1"))
 				.thenThrow(new CoreException(ExhibitionErrorCode.EXTERNAL_API_UNAVAILABLE, "외부 API 실패"));
-		DetailEnricher enricher = new DetailEnricher(jobFacade, facade, draftFacade, client, props);
+		DetailEnricher enricher = new DetailEnricher(jobFacade, facade, backfill, draftFacade,
+				new DraftEnrichmentService(draftFacade, client, mock(GenreClassifier.class)), client, props);
 
 		enricher.enrichDetails();
 
 		verify(jobFacade).markFailed(eq(job), eq(OutboxFailureType.RETRYABLE), any(), any());
-		verify(facade, never()).applyDetailForJob(any(), any());
+		verify(facade, never()).applyLegacyDetail(any(), any());
 	}
 
 	@Test
@@ -90,16 +99,18 @@ class DetailEnricherTest {
 	void 이미완성_성공마감() {
 		ExhibitionOutboxFacade jobFacade = mock(ExhibitionOutboxFacade.class);
 		ExhibitionSyncFacade facade = mock(ExhibitionSyncFacade.class);
+		ExhibitionBackfill backfill = mock(ExhibitionBackfill.class);
 		ExhibitionCatalogClient client = mock(ExhibitionCatalogClient.class);
 		ExhibitionDraftFacade draftFacade = mock(ExhibitionDraftFacade.class);
 		OutboxMessage job = detailJob("E1");
 		when(jobFacade.findDue(eq(OutboxMessageType.FETCH_DETAIL), anyInt(), any())).thenReturn(List.of(job));
-		when(facade.findDetailTargetState("E1")).thenReturn(DetailTargetState.ALREADY_SYNCED);
-		DetailEnricher enricher = new DetailEnricher(jobFacade, facade, draftFacade, client, props);
+		when(backfill.findDetailTargetState("E1")).thenReturn(DetailTargetState.ALREADY_SYNCED);
+		DetailEnricher enricher = new DetailEnricher(jobFacade, facade, backfill, draftFacade,
+				new DraftEnrichmentService(draftFacade, client, mock(GenreClassifier.class)), client, props);
 
 		enricher.enrichDetails();
 
-		verify(client, never()).fetchDetail(any());
+		verify(client, never()).fetchDetailSnapshot(any());
 		verify(jobFacade).markSucceeded(eq(job), any());
 	}
 
@@ -108,16 +119,18 @@ class DetailEnricherTest {
 	void 전시미적재_재시도로_남긴다() {
 		ExhibitionOutboxFacade jobFacade = mock(ExhibitionOutboxFacade.class);
 		ExhibitionSyncFacade facade = mock(ExhibitionSyncFacade.class);
+		ExhibitionBackfill backfill = mock(ExhibitionBackfill.class);
 		ExhibitionCatalogClient client = mock(ExhibitionCatalogClient.class);
 		ExhibitionDraftFacade draftFacade = mock(ExhibitionDraftFacade.class);
 		OutboxMessage job = detailJob("E1");
 		when(jobFacade.findDue(eq(OutboxMessageType.FETCH_DETAIL), anyInt(), any())).thenReturn(List.of(job));
-		when(facade.findDetailTargetState("E1")).thenReturn(DetailTargetState.MISSING);
-		DetailEnricher enricher = new DetailEnricher(jobFacade, facade, draftFacade, client, props);
+		when(backfill.findDetailTargetState("E1")).thenReturn(DetailTargetState.MISSING);
+		DetailEnricher enricher = new DetailEnricher(jobFacade, facade, backfill, draftFacade,
+				new DraftEnrichmentService(draftFacade, client, mock(GenreClassifier.class)), client, props);
 
 		enricher.enrichDetails();
 
-		verify(client, never()).fetchDetail(any());
+		verify(client, never()).fetchDetailSnapshot(any());
 		verify(jobFacade).markFailed(eq(job), eq(OutboxFailureType.RETRYABLE), any(), any());
 	}
 
@@ -126,18 +139,20 @@ class DetailEnricherTest {
 	void draft경로_상세반영() {
 		ExhibitionOutboxFacade jobFacade = mock(ExhibitionOutboxFacade.class);
 		ExhibitionSyncFacade facade = mock(ExhibitionSyncFacade.class);
+		ExhibitionBackfill backfill = mock(ExhibitionBackfill.class);
 		ExhibitionCatalogClient client = mock(ExhibitionCatalogClient.class);
 		ExhibitionDraftFacade draftFacade = mock(ExhibitionDraftFacade.class);
 		OutboxMessage job = detailJob("E1");
 		when(jobFacade.findDue(eq(OutboxMessageType.FETCH_DETAIL), anyInt(), any())).thenReturn(List.of(job));
 		when(draftFacade.needsDetail("E1")).thenReturn(true);
-		when(client.fetchDetail("E1")).thenReturn(Optional.of(detail()));
-		DetailEnricher enricher = new DetailEnricher(jobFacade, facade, draftFacade, client, props);
+		when(client.fetchDetailSnapshot("E1")).thenReturn(Optional.of(detail()));
+		DetailEnricher enricher = new DetailEnricher(jobFacade, facade, backfill, draftFacade,
+				new DraftEnrichmentService(draftFacade, client, mock(GenreClassifier.class)), client, props);
 
 		enricher.enrichDetails();
 
-		verify(draftFacade).applyDetail(eq("E1"), any(), any()); // 장르 스텝 체인은 draft 파사드 트랜잭션 안에서 걸린다
-		verify(facade, never()).applyDetailForJob(any(), any()); // 전시 폴백 경로로 새지 않는다
+		verify(draftFacade).applyDetail(eq("E1"), any(), any(), any()); // 장르 스텝 체인은 draft 파사드 트랜잭션 안에서 걸린다
+		verify(facade, never()).applyLegacyDetail(any(), any()); // 전시 폴백 경로로 새지 않는다
 		verify(jobFacade).markSucceeded(eq(job), any());
 	}
 
@@ -146,13 +161,14 @@ class DetailEnricherTest {
 	void draft경로_영구실패_draft도_FAILED() {
 		ExhibitionOutboxFacade jobFacade = mock(ExhibitionOutboxFacade.class);
 		ExhibitionSyncFacade facade = mock(ExhibitionSyncFacade.class);
+		ExhibitionBackfill backfill = mock(ExhibitionBackfill.class);
 		ExhibitionCatalogClient client = mock(ExhibitionCatalogClient.class);
 		ExhibitionDraftFacade draftFacade = mock(ExhibitionDraftFacade.class);
 		OutboxMessage job = detailJob("E1");
 		when(jobFacade.findDue(eq(OutboxMessageType.FETCH_DETAIL), anyInt(), any())).thenReturn(List.of(job));
 		when(draftFacade.needsDetail("E1")).thenReturn(true);
 		// 4xx = PERMANENT 분류. 실제 파사드처럼 markFailed가 엔티티 전이를 일으키게 스텁한다(상태 관측이 판정 재료라서).
-		when(client.fetchDetail("E1")).thenThrow(
+		when(client.fetchDetailSnapshot("E1")).thenThrow(
 				org.springframework.web.client.HttpClientErrorException.create(
 						org.springframework.http.HttpStatus.NOT_FOUND, "not found", null, null, null));
 		org.mockito.Mockito.doAnswer(inv -> {
@@ -160,7 +176,8 @@ class DetailEnricherTest {
 			m.recordFailure(inv.getArgument(1), inv.getArgument(2), props.retryPolicy(), inv.getArgument(3));
 			return null;
 		}).when(jobFacade).markFailed(any(), any(), any(), any());
-		DetailEnricher enricher = new DetailEnricher(jobFacade, facade, draftFacade, client, props);
+		DetailEnricher enricher = new DetailEnricher(jobFacade, facade, backfill, draftFacade,
+				new DraftEnrichmentService(draftFacade, client, mock(GenreClassifier.class)), client, props);
 
 		enricher.enrichDetails();
 
@@ -173,13 +190,15 @@ class DetailEnricherTest {
 	void 도래없음_무호출() {
 		ExhibitionOutboxFacade jobFacade = mock(ExhibitionOutboxFacade.class);
 		ExhibitionSyncFacade facade = mock(ExhibitionSyncFacade.class);
+		ExhibitionBackfill backfill = mock(ExhibitionBackfill.class);
 		ExhibitionCatalogClient client = mock(ExhibitionCatalogClient.class);
 		ExhibitionDraftFacade draftFacade = mock(ExhibitionDraftFacade.class);
 		when(jobFacade.findDue(eq(OutboxMessageType.FETCH_DETAIL), anyInt(), any())).thenReturn(List.of());
-		DetailEnricher enricher = new DetailEnricher(jobFacade, facade, draftFacade, client, props);
+		DetailEnricher enricher = new DetailEnricher(jobFacade, facade, backfill, draftFacade,
+				new DraftEnrichmentService(draftFacade, client, mock(GenreClassifier.class)), client, props);
 
 		enricher.enrichDetails();
 
-		verify(client, never()).fetchDetail(any());
+		verify(client, never()).fetchDetailSnapshot(any());
 	}
 }

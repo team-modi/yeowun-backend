@@ -1,6 +1,6 @@
 package modi.backend.application.exhibition;
 
-import modi.backend.application.exhibition.sync.CatalogSynchronizer;
+import modi.backend.ingestion.application.CatalogSynchronizer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
@@ -20,20 +20,20 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import modi.backend.TestcontainersConfiguration;
-import modi.backend.domain.exhibition.sync.data.CatalogExhibitionData;
-import modi.backend.domain.exhibition.sync.data.CatalogListData;
-import modi.backend.domain.exhibition.sync.port.ExhibitionCatalogClient;
+import modi.backend.ingestion.domain.data.CatalogExhibitionData;
+import modi.backend.ingestion.domain.data.CatalogListData;
+import modi.backend.ingestion.domain.port.ExhibitionCatalogClient;
 import modi.backend.domain.exhibition.catalog.ExhibitionCategory;
 import modi.backend.domain.exhibition.catalog.ExhibitionRegion;
 
 /**
- * 외부 호출 감사({@code external_api_call})와 동기화 실행 기록({@code sync_run}) 검증(이관 5단계).
+ * 외부 호출 감사({@code external_api_call_log})와 동기화 실행 기록({@code ingestion_run}) 검증(이관 5단계).
  * <p>
  * 이 단계도 <b>읽기를 바꾸지 않으므로</b> 설계상 기존 테스트 전부에 보이지 않는다 — 적재가 통째로 no-op가 돼도
  * 응답도 exhibitions도 그대로다. "실제로 남았는가"를 보는 테스트가 없으면 이 단계는 검증되지 않은 채로 남는다.
  * <p>
  * 감사 기록은 어댑터(전송 계층)가 남기므로 여기서는 <b>{@link ExhibitionCatalogClient}를 목으로 두지 않고</b>
- * sync_run 쪽만 본다. 어댑터의 호출 기록은 {@code CultureExhibitionClientAuditTest}가 실 HTTP로 검증한다.
+ * ingestion_run 쪽만 본다. 어댑터의 호출 기록은 {@code CultureExhibitionClientAuditTest}가 실 HTTP로 검증한다.
  */
 @Import(TestcontainersConfiguration.class)
 @SpringBootTest(properties = "app.exhibition.enrich.scheduling-enabled=false")
@@ -51,12 +51,12 @@ class ExternalApiCallAuditTest {
 	ExhibitionCatalogClient exhibitionCatalogClient;
 
 	@Test
-	@DisplayName("동기화 실행 — 원천이 말한 총 건수·집계가 sync_run에 남는다(로그로만 흘려보내던 값)")
+	@DisplayName("동기화 실행 — 원천이 말한 총 건수·집계가 ingestion_run에 남는다(로그로만 흘려보내던 값)")
 	void syncCatalog_실행기록_적재() {
 		String externalId = nextId();
 		given(exhibitionCatalogClient.fetchAll())
 				.willReturn(new CatalogListData(List.of(listItem(externalId)), 280, false));
-		given(exhibitionCatalogClient.fetchDetail(eq(externalId))).willReturn(Optional.empty());
+		given(exhibitionCatalogClient.fetchDetailSnapshot(eq(externalId))).willReturn(Optional.empty());
 		long before = countSyncRuns();
 
 		catalogSynchronizer.syncCatalog();
@@ -111,10 +111,10 @@ class ExternalApiCallAuditTest {
 	}
 
 	private long countSyncRuns() {
-		return jdbcTemplate.queryForObject("select count(*) from sync_run", Long.class);
+		return jdbcTemplate.queryForObject("select count(*) from ingestion_run", Long.class);
 	}
 
 	private java.util.Map<String, Object> latestSyncRun() {
-		return jdbcTemplate.queryForMap("select * from sync_run order by id desc limit 1");
+		return jdbcTemplate.queryForMap("select * from ingestion_run order by id desc limit 1");
 	}
 }

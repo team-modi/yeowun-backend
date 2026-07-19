@@ -1,6 +1,6 @@
 package modi.backend.domain.exhibition.genre;
 
-import modi.backend.domain.exhibition.sync.port.GenreClassifier;
+import modi.backend.domain.exhibition.genre.GenreClassifier;
 
 import java.util.List;
 
