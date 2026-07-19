@@ -54,6 +54,26 @@ public class ExhibitionOutboxFacade {
 		eventPublisher.publishEvent(new OutboxEnqueued(messageType));
 	}
 
+	/**
+	 * 멱등 enqueue + <b>종료 메시지 부활</b> 변형 — 재sync 안전망 전용(ADR-12 보강). 일반 {@link #enqueue}는 종료된
+	 * 일회성 메시지를 되살리지 않지만, "종료 메시지 + 미종료 draft" 조합이 실제로 생긴다: 게이트가 일시적으로
+	 * 풀린 창에 드레인된 EXHIBITION_READY(no-op 소비→SUCCEEDED), 실패 전이 후 draft 가시화 전 크래시,
+	 * 수동 개입 뒤 재스테이징. 이 안전망이 그 행을 되살려 draft가 영구 침묵하지 않게 한다(치유 경로).
+	 * 재승격 방지의 실제 가드는 메시지 비부활이 아니라 draft terminal 검사 + external_id UK다 — 부활은 안전하다.
+	 */
+	@Transactional
+	public void enqueueOrReactivate(OutboxMessageType messageType, String targetKey, LocalDateTime now) {
+		if (targetKey == null || targetKey.isBlank()) {
+			return;
+		}
+		outboxMessageRepository.findByMessageTypeAndTargetKey(messageType, targetKey)
+				.ifPresentOrElse(existing -> {
+					existing.reactivate(now); // 종료됐던 메시지면 되살리고, 미종료면 no-op(이미 선별 대상).
+					outboxMessageRepository.save(existing);
+				}, () -> outboxMessageRepository.save(OutboxMessage.enqueue(messageType, targetKey, now)));
+		eventPublisher.publishEvent(new OutboxEnqueued(messageType));
+	}
+
 	/** 여러 대상을 한꺼번에 멱등 enqueue한다(장르 스윕처럼 다건 등록에 쓴다). */
 	@Transactional
 	public void enqueueAll(OutboxMessageType messageType, Collection<String> targetKeys, LocalDateTime now) {

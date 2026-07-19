@@ -76,14 +76,15 @@ public class ExhibitionDraftFacade {
 		}
 		existing.refreshFromList(data);
 		exhibitionDraftRepository.save(existing);
-		// 미해소 스텝의 메시지가 (수동 삭제 등으로) 사라졌어도 멱등 enqueue가 안전망으로 복원한다.
+		// 미해소 스텝의 메시지가 사라졌거나 <b>종료로 굳었어도</b> 재sync 안전망이 복원·부활시킨다(ADR-12 보강 —
+		// 게이트 일시 해제 창의 no-op 소비, 실패 전이 후 크래시 같은 드문 창에서도 draft가 영구 침묵하지 않는다).
 		switch (existing.nextStep()) {
-			case FETCH_DETAIL -> exhibitionOutboxFacade.enqueue(OutboxMessageType.FETCH_DETAIL,
+			case FETCH_DETAIL -> exhibitionOutboxFacade.enqueueOrReactivate(OutboxMessageType.FETCH_DETAIL,
 					existing.getExternalId(), now);
-			case CLASSIFY_GENRE -> exhibitionOutboxFacade.enqueue(OutboxMessageType.CLASSIFY_GENRE,
+			case CLASSIFY_GENRE -> exhibitionOutboxFacade.enqueueOrReactivate(OutboxMessageType.CLASSIFY_GENRE,
 					existing.getExternalId(), now);
 			// 게이트는 다 찼는데 종료 전인 draft — 잃어버린 승격 신호를 복원한다(ADR-12).
-			case PROMOTE -> exhibitionOutboxFacade.enqueue(OutboxMessageType.EXHIBITION_READY,
+			case PROMOTE -> exhibitionOutboxFacade.enqueueOrReactivate(OutboxMessageType.EXHIBITION_READY,
 					existing.getExternalId(), now);
 			case NONE -> { /* 목록 코어 불완전 — 다음 sync가 채운다 */ }
 		}

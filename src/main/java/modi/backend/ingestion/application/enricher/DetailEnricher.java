@@ -133,7 +133,7 @@ public class DetailEnricher {
 		}
 		try {
 			detail.ifPresentOrElse(f -> exhibitionSyncFacade.applyLegacyDetail(externalId, f),
-					() -> exhibitionBackfill.markDetailChecked(externalId, LocalDateTime.now()));
+					() -> exhibitionBackfill.markDetailChecked(externalId, now));
 		} catch (OptimisticLockingFailureException e) {
 			return false; // 반영 중 충돌 — 다른 워커가 처리
 		} catch (RuntimeException e) {

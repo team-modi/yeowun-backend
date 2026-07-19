@@ -1,7 +1,6 @@
 package modi.backend.domain.exhibition.hours;
 
 import modi.backend.domain.exhibition.hours.PlaceHoursData;
-import modi.backend.ingestion.domain.port.PlaceHoursProvider;
 
 /**
  * 영업시간을 준 벤더(정준층 — {@code place_hours.provider}).

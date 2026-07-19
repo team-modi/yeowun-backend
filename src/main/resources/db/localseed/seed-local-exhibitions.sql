@@ -8,7 +8,7 @@
 --       원본 V26 스냅샷을 이관 스키마 형태로 변환했다(전시장/상세/작가 분리) — 시드는 마이그레이션 이후 실행되므로
 --       drop된 컬럼을 INSERT하면 깨진다. 그래서 exhibitions는 코어 컬럼만, 장소는 exhibition_place(정규화 이름 dedup),
 --       상세(price/description/img)는 exhibition_detail로 나눠 적재한다(작가는 원천 미보유라 조인 없음).
--- 주의: 스키마를 바꾸는 브랜치는 이 파일 정합을 함께 확인할 것 (exhibition-erd-build 스킬 규칙 4).
+-- 주의: 스키마를 바꾸는 브랜치는 이 파일 정합을 함께 확인할 것 (exhibition-erd-build 스킬 규칙 4). V39(벤더 스냅샷 필드화) 기준.
 -- 포함: exhibition_place(229) exhibitions(313) exhibition_detail(293) exhibition_genre(313)
 --       culture_list_snapshot(283) culture_detail_snapshot(12) place_hours(0) google_place_snapshot(0) venues(12)
 -- =====================================================================
@@ -23,6 +23,11 @@ DELETE FROM culture_detail_snapshot;
 DELETE FROM culture_list_snapshot;
 DELETE FROM exhibitions;
 DELETE FROM exhibition_place;
+-- 파이프라인 테이블도 비운다 — 재시드 후 옛 in-flight 행(draft·메시지·감사)이 잔존해 시드 off 전환 시 오동작하지 않게.
+DELETE FROM exhibition_draft;
+DELETE FROM exhibition_outbox;
+DELETE FROM ingestion_run;
+DELETE FROM external_api_call_log;
 DELETE FROM venues;
 SET FOREIGN_KEY_CHECKS=1;
 -- MySQL dump 10.13  Distrib 8.4.10, for Linux (aarch64)
