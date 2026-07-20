@@ -61,8 +61,9 @@ services:
       - 'SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/mydatabase'
       - 'SPRING_DATASOURCE_USERNAME=myuser'
       - 'SPRING_DATASOURCE_PASSWORD=secret'
-      # AI 임시저장(draft) 캐시 — 같은 compose 네트워크의 redis 서비스로 접속(운영 배포도 동일).
-      - 'SPRING_DATA_REDIS_HOST=redis'
+      # AI 임시저장(draft) 캐시 — 기본은 같은 compose 네트워크의 redis 서비스명(운영 배포도 동일).
+      #   `:-` 형태라 .env에 없거나 빈값이어도 'redis'로 폴백한다(외부 Redis로 옮길 땐 .env에서 이 값만 교체).
+      - 'SPRING_DATA_REDIS_HOST=${SPRING_DATA_REDIS_HOST:-redis}'
       # 비어 있으면 default 프로파일(=로컬 CORS). 운영 배포는 .env로 prod 주입(=Vercel CORS).
       - 'SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-}'
       # OAuth/JWT 시크릿: .env로 주입(배포 시 GitHub Actions secrets → deploy.yml이 .env에 기록).
